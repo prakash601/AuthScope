@@ -55,6 +55,7 @@ class ScanSettings(BaseSettings):
 
     timeout_seconds: int = Field(default=45, ge=5, le=300)
     lazy_captcha_wait_seconds: int = Field(default=5, ge=0, le=60)
+    result_cache_ttl_hours: int = Field(default=6, ge=1, le=168)
     context_max_ram_mb: int = 150
     retry_blocked_once: bool = True
 
@@ -63,6 +64,19 @@ class ApiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="API_", env_file=".env", extra="ignore")
 
     rate_limit_per_minute: int = 60
+
+
+class SecuritySettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="SECURITY_", env_file=".env", extra="ignore")
+
+    disable_ssrf_guard: bool = False  # dev/test only — never enable in production
+
+
+class EvidenceSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="EVIDENCE_", env_file=".env", extra="ignore")
+
+    retention_days: int = 30
+    presign_expires_seconds: int = Field(default=300, ge=1, le=604800)
 
 
 class Settings(BaseSettings):
@@ -75,6 +89,8 @@ class Settings(BaseSettings):
     s3: S3Settings = Field(default_factory=lambda: S3Settings())
     scan: ScanSettings = Field(default_factory=lambda: ScanSettings())
     api: ApiSettings = Field(default_factory=lambda: ApiSettings())
+    security: SecuritySettings = Field(default_factory=lambda: SecuritySettings())
+    evidence: EvidenceSettings = Field(default_factory=lambda: EvidenceSettings())
     redis_url: str = "redis://localhost:6379/0"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

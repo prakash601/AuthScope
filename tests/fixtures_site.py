@@ -11,6 +11,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FIXTURE_PORT = 8931
+_FLAKY_HITS = 0
 
 
 def page(name: str) -> str:
@@ -173,6 +174,22 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 b"<body>Verifying you are human. This is a cf-challenge.</body></html>",
                 status=403,
                 headers={"Server": "cloudflare"},
+            )
+            return
+        if path == "/flaky_block.html":
+            # 403 challenge on the FIRST hit, real page afterwards (retry testing).
+            global _FLAKY_HITS
+            _FLAKY_HITS += 1
+            if _FLAKY_HITS <= 1:
+                self._send(
+                    b"<html><head><title>Just a moment...</title></head>"
+                    b"<body>Verifying you are human</body></html>",
+                    status=403,
+                )
+                return
+            self._send(
+                HTML["password_form_like"].encode(),
+                headers={"Set-Cookie": "sessionid=fresh; Path=/"},
             )
             return
         if path == "/waf_cookies.html":

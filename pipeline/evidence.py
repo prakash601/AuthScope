@@ -76,3 +76,38 @@ def download(client, uri: str) -> bytes:
     bucket, key = parse_s3_uri(uri)
     obj = client.get_object(Bucket=bucket, Key=key)
     return obj["Body"].read()
+
+
+def presign_url(uri: str, expires_seconds: int | None = None, client=None) -> str:
+    """Short-lived signed HTTPS GET URL for a stored s3:// reference."""
+    settings = get_settings().evidence
+    expires = expires_seconds or settings.presign_expires_seconds
+    c = client or make_client()
+    bucket, key = parse_s3_uri(uri)
+    return c.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": key},
+        ExpiresIn=expires,
+    )
+
+
+def cleanup_expired(retention_days: int | None = None, prefix: str = "scans/", client=None) -> int:
+    """Delete artifacts older than the retention window. Returns deleted count."""
+    import datetime as dt
+
+    days = retention_days if retention_days is not None else get_settings().evidence.retention_days
+    cutoff = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
+    c = client or make_client()
+    bucket = get_settings().s3.bucket
+    paginator = c.get_paginator("list_objects_v2")
+    to_delete: list[dict] = []
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            if obj["LastModified"] < cutoff:
+                to_delete.append({"Key": obj["Key"]})
+    for i in range(0, len(to_delete), 1000):
+        chunk = to_delete[i : i + 1000]
+        c.delete_objects(Bucket=bucket, Delete={"Objects": chunk})
+    if to_delete:
+        logger.info("evidence cleanup removed %d objects (>%dd old)", len(to_delete), days)
+    return len(to_delete)
