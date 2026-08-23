@@ -15,7 +15,7 @@
 | **M0 — Foundation** | Repo scaffold, dev environment, database | ISS-001 – ISS-004 | ✅ |
 | **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ✅ |
 | **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ✅ |
-| **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ⬜ |
+| **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ✅ |
 | **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ⬜ |
 
 Dependency rule: within a milestone, issues must be done in order unless explicitly marked "parallelizable".
@@ -329,101 +329,101 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 ## M3 — API & Orchestration
 
 ### ISS-017 — FastAPI skeleton, auth & rate limiting
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** App factory, router registration, `X-API-Key` authentication middleware backed by api_keys table, Redis-backed 60 req/min sliding window per key, structured error responses, OpenAPI docs.
 
 **Tasks:**
-- [ ] App factory + lifespan (DB pool, Redis client)
-- [ ] API key dependency: lookup, active check, last_used update
-- [ ] Rate limiter middleware (Redis INCR+EXPIRE or sliding window), 429 with Retry-After
-- [ ] Global exception handler → consistent JSON errors; request ID + structlog access logs
+- [x] App factory + lifespan (DB pool, Redis client)
+- [x] API key dependency: lookup, active check, last_used update
+- [x] Rate limiter middleware (Redis INCR+EXPIRE or sliding window), 429 with Retry-After
+- [x] Global exception handler → consistent JSON errors; request ID + structlog access logs
 
 **Acceptance criteria:**
-- [ ] Request without/invalid key → 401; valid key → pass
-- [ ] 61st request within a minute → 429 with correct headers; resets after window
-- [ ] `/docs` renders; health endpoint `/healthz` checks DB+Redis
+- [x] Request without/invalid key → 401; valid key → pass
+- [x] 61st request within a minute → 429 with correct headers; resets after window
+- [x] `/docs` renders; health endpoint `/healthz` checks DB+Redis
 
 ---
 
 ### ISS-018 — POST /v1/scans + Celery job creation
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** The main scan entrypoint: validate URL, normalize, dedupe/cache-check (6h TTL unless force=true), create scans row (queued), enqueue Celery task, return 202 with scan_id.
 
 **Tasks:**
-- [ ] Request/response Pydantic schemas incl. options (proxy_country, capture_har, deep_scan, force)
-- [ ] URL normalization + validation (SSRF guard: block private/link-local IPs, allowlist schemes)
-- [ ] Result-cache lookup keyed on normalized_url
-- [ ] Celery app config (Redis broker/backend), task `run_scan(scan_id)`
-- [ ] Worker end-to-end: dequeue → run engine pipeline → persist → status transitions queued→running→completed/failed/waf_blocked
+- [x] Request/response Pydantic schemas incl. options (proxy_country, capture_har, deep_scan, force)
+- [x] URL normalization + validation (SSRF guard: block private/link-local IPs, allowlist schemes)
+- [x] Result-cache lookup keyed on normalized_url
+- [x] Celery app config (Redis broker/backend), task `run_scan(scan_id)`
+- [x] Worker end-to-end: dequeue → run engine pipeline → persist → status transitions queued→running→completed/failed/waf_blocked
 
 **Acceptance criteria:**
-- [ ] Valid request → 202 {scan_id, status:"queued"}; row exists with status queued
-- [ ] Same URL within 6h returns cached scan_id unless force=true
-- [ ] SSRF attempt (http://169.254.169.254/) rejected 400/422
-- [ ] Full happy-path integration test: create → worker completes → report in DB
+- [x] Valid request → 202 {scan_id, status:"queued"}; row exists with status queued
+- [x] Same URL within 6h returns cached scan_id unless force=true
+- [x] SSRF attempt (http://169.254.169.254/) rejected 400/422
+- [x] Full happy-path integration test: create → worker completes → report in DB
 
 ---
 
 ### ISS-019 — GET /v1/scans/{id} + list/search endpoint
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Report retrieval matching the documented response shape, plus paginated list/search with filters (provider, captcha type, score ranges, status).
 
 **Acceptance criteria:**
-- [ ] Completed scan returns full report incl. evidence URLs (signed, short-lived for S3/MinIO)
-- [ ] Queued/running scan returns status-only 200
-- [ ] Unknown id → 404; other-user's key's scan → 404 (no info leak)
-- [ ] List endpoint pagination + ≥3 filters verified by tests
+- [x] Completed scan returns full report incl. evidence URLs (signed, short-lived for S3/MinIO)
+- [x] Queued/running scan returns status-only 200
+- [x] Unknown id → 404; other-user's key's scan → 404 (no info leak)
+- [x] List endpoint pagination + ≥3 filters verified by tests
 
 ---
 
 ### ISS-020 — Bulk scan (CSV)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** `POST /v1/scans/bulk` accepting CSV (≤1000 URLs), creating batch + individual scan jobs, fan-out to workers with concurrency control.
 
 **Acceptance criteria:**
-- [ ] 1000-row CSV accepted; batch id returned with per-URL scan ids
-- [ ] Malformed rows skipped and reported, valid rows still processed
-- [ ] Batch completes with mixed outcomes (some waf_blocked) without blocking others
+- [x] 1000-row CSV accepted; batch id returned with per-URL scan ids
+- [x] Malformed rows skipped and reported, valid rows still processed
+- [x] Batch completes with mixed outcomes (some waf_blocked) without blocking others
 
 ---
 
 ### ISS-021 — Webhook dispatcher
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** On scan completion, signed POST of the report JSON to registered webhook URLs; retries with exponential backoff; dead-letter after max attempts.
 
 **Acceptance criteria:**
-- [ ] Local receiver gets POST within seconds of completion; HMAC signature header verifiable
-- [ ] Failing receiver retried ≥3 times with backoff then dead-lettered (observable)
-- [ ] Webhook CRUD endpoints tested
+- [x] Local receiver gets POST within seconds of completion; HMAC signature header verifiable
+- [x] Failing receiver retried ≥3 times with backoff then dead-lettered (observable)
+- [x] Webhook CRUD endpoints tested
 
 ---
 
 ### ISS-022 — Retry & blocked-scan policy
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Worker-level resilience: initial-block (403/challenge) → one retry with different proxy country → final `waf_blocked` state with whatever partial intelligence was gathered.
 
 **Acceptance criteria:**
-- [ ] Simulated 403-first-then-success flow completes with real findings after retry
-- [ ] Persistent-block flow ends `waf_blocked`, never `failed`
-- [ ] Retry uses different exit country than first attempt (logged/asserted)
+- [x] Simulated 403-first-then-success flow completes with real findings after retry
+- [x] Persistent-block flow ends `waf_blocked`, never `failed`
+- [x] Retry uses different exit country than first attempt (logged/asserted)
 
 ---
 
 ### ISS-023 — Evidence storage service (S3/MinIO)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Dedicated service abstracting artifact upload/download: HAR, screenshot, DOM snapshot, trace; private bucket, short-lived signed GET URLs; lifecycle cleanup for expired artifacts.
 
 **Acceptance criteria:**
-- [ ] Upload→signed-url→download round-trip works against MinIO in compose
-- [ ] Unsigned direct access denied (bucket private)
-- [ ] Signed URL expiry honored; cleanup job removes artifacts past retention
+- [x] Upload→signed-url→download round-trip works against MinIO in compose
+- [x] Unsigned direct access denied (bucket private)
+- [x] Signed URL expiry honored; cleanup job removes artifacts past retention
 
 ---
 

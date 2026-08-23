@@ -226,5 +226,82 @@
 - **75/75 tests pass**; ruff + mypy clean across 33 source files.
 - Full pipeline now proven end-to-end at unit level: findings → aggregate → score → evidence upload → Postgres persistence → readback.
 
+## ISS-017 — FastAPI skeleton, auth & rate limiting (2026-08-23)
+### What was done
+- `api/main.py`: `create_app(settings)` factory with lifespan (async engine + session factory + Redis client on app.state), request-ID middleware (`X-Request-ID` echoed), global exception handler → uniform JSON error envelope, `/healthz` probing Postgres + Redis, OpenAPI docs at `/docs`.
+- `api/deps.py`: `require_api_key` dependency — SHA-256 hash lookup against `api_keys`, active check, Redis fixed-window rate limiter (INCR+EXPIRE, per-key limit from DB column) returning 429 + `Retry-After`; best-effort `last_used_at` update that can never fail a request.
+- Settings injected via app.state so tests can run isolated app instances.
+### Design decisions / deviations
+- Fixed 60s windows instead of sliding windows — simpler, atomic, adequate for 60/min defaults; documented.
+### Limitations & known gaps
+- Rate limiter is per-key only (no IP/global tiers yet).
+- No JWT/user-token auth — API-key only for now (dashboard sessions come with M4).
+### How to verify
+- `pytest tests/test_api_auth.py` — 401 missing/invalid key, valid pass, 2-per-min key hits 429 with Retry-After header, healthz checks both deps.
+
+## ISS-018 — POST /v1/scans + Celery job creation (2026-08-23)
+### What was done
+- `api/routes/scans.py`: POST creates normalized scan row (status=queued) and enqueues `run_scan` via the task object (`.delay()`) so eager mode works in tests; returns 202 `{scan_id, status}`.
+- `api/urls.py`: `normalize_url` (lowercase scheme/host, strip default port/fragment) + `assert_public_url` SSRF guard resolving DNS and rejecting private/loopback/link-local/reserved targets; `SECURITY_DISABLE_SSRF_GUARD` flag exists for dev/tests only.
+- Result cache: worker writes `resultcache:url:<sha256>` → scan_id (6h TTL from `SCAN_RESULT_CACHE_TTL_HOURS`) on **completed** scans only; create returns cached completed scans unless `force=true`.
+- `workers/celery_app.py` + `workers/tasks.py`: `run_scan` task drives the full engine pipeline (browser → detectors → aggregate → evidence upload → persist → webhooks → cache).
+### Design decisions / deviations
+- Task invoked as `run_scan.delay()` not `app.send_task()` — send_task bypasses `task_always_eager`, which broke test execution.
+- The task entrypoint detects a running event loop and offloads to a worker thread when eager-executed inside one; production workers take the direct `asyncio.run` path.
+- Only successful scans are cached: failed/waf_blocked results are never served from cache, so clients aren't stuck for the TTL after a transient failure.
+### Limitations & known gaps
+- Celery runs with Redis broker; RabbitMQ swap is config-only but untested.
+- No priority queues yet (bulk vs single same queue).
+### How to verify
+- `pytest tests/test_scans_api.py::test_create_* test_ssrf_guard_blocks_private_targets test_result_cache_returns_same_completed_scan` and `tests/test_worker_scans.py::test_run_scan_completes_end_to_end` (eager Celery → real Chromium scan of fixture site → report retrievable).
+
+## ISS-019 — GET report + list/search (2026-08-23)
+### What was done
+- GET /v1/scans/{id}: queued/running → status-only body; completed/waf_blocked → full report reconstructed from DB rows matching the ScanReport shape, artifact URIs converted to short-lived presigned URLs. Unknown id or another user's scan → 404 (no existence leak).
+- GET /v1/scans: pagination (limit capped 200) + filters provider / captcha_type / waf_provider (pg ARRAY contains) / min-max difficulty / status; total count included.
+### How to verify
+- `pytest tests/test_scans_api.py -k "get_unknown or ownership or full_report or list_filters"` — includes jsonschema validation of the GET response against the committed report schema.
+
+## ISS-020 — Bulk CSV scans (2026-08-23)
+### What was done
+- POST /v1/scans/bulk accepts `text/csv` with a `url` column (headerless URL lists also accepted), ≤1000 rows; malformed/unroutable URLs are skipped with reasons while valid rows proceed; each scan tagged `options.batch_id`; response carries batch id + accepted/skipped counts + per-URL results.
+### Limitations & known gaps
+- Batch progress endpoint not built (filter list by batch id comes with dashboard M4); no batch-level webhook aggregation.
+### How to verify
+- `pytest tests/test_bulk_api.py` — batch creation + options tag, malformed-row skipping, >1000 rejection (400 `too_many_urls`), empty body 400, headerless input.
+
+## ISS-021 — Webhook dispatcher (2026-08-23)
+### What was done
+- `workers/webhooks.py`: HMAC-SHA256 signed POSTs (`X-AuthScope-Signature: sha256=<hex>` over the raw body), 3 attempts with exponential backoff (1s/2s), failures pushed to a Redis dead-letter list (`webhooks:dlq`) with timestamps.
+- CRUD endpoints under /v1/webhooks: register (secret returned once), list (no secrets), delete (owner-scoped); invalid UUID → 404.
+- Worker dispatches all active user webhooks after persisting a completed/waf_blocked report.
+### How to verify
+- `pytest tests/test_webhooks.py` — programmable receiver proves signature validity, retry-then-succeed on 3rd attempt (backoff observed), persistent failure → DLQ entry observable, CRUD incl. ownership.
+
+## ISS-022 — Retry & blocked-scan policy (2026-08-23)
+### What was done
+- Worker loop: blocked first attempt → exactly one retry through a different proxy-pool country (`ProxyManager.get_different_country_proxy`); persistent block ends `waf_blocked` with partial intelligence persisted, never `failed`. Attempt count + attempted countries recorded in `scans.options`.
+- Policy isolated in pure `should_retry_blocked(attempt, retry_enabled)`; pool configured via `AUTHSCOPE_PROXY_POOL` env JSON (empty = direct connections).
+### How to verify
+- `pytest tests/test_worker_scans.py -k "retry or persistent"` — fixture route serves a 403 challenge on first hit then the real page: scan completes after retry; always-blocked route ends waf_blocked; decision-function table test.
+
+## ISS-023 — Evidence storage service (2026-08-23)
+### What was done
+- `pipeline/evidence.py` extended: `presign_url()` (short-lived signed GETs, TTL from settings), `cleanup_expired()` retention job (paginated listing + batch delete, cutoff by LastModified, prefix-scoped for testing).
+### Limitations & known gaps
+- Actual expiry honored by MinIO/S3 natively (verified status 200 within window, 403 unsigned); an explicit expired-URL wait test would need clock manipulation and was skipped.
+- Cleanup is invoked manually/CRON-stubbed; Celery beat schedule lands with M4 hardening.
+### How to verify
+- `pytest tests/test_evidence_service.py` — presigned GET round-trip byte-identical, unsigned access 403, retention cleanup deletes exactly the prefixed objects.
+
+## M3 verification summary (2026-08-23)
+- **107/107 tests pass** (~69s): API auth/rate-limit, scan create/cache/SSRF, retrieval/schema/list filters, bulk CSV, eager-Celery end-to-end scans with real Chromium, retry/waf_blocked policy, webhook signing/retry/DLQ/CRUD, evidence presign/cleanup.
+- ruff + mypy clean across 45 source files.
+### Known gaps carried forward
+- Dashboard, historical diff, feedback endpoints, observability, CI pipeline, K8s packaging remain for M4.
+- Proxy pool is env-config stub; residential providers (BrightData etc.) plug into `ProxyManager` later.
+- Webhook DLQ has no re-drive UI/API yet (entries are inspectable in Redis).
+
+
 
 
