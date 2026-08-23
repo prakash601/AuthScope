@@ -191,4 +191,40 @@
 - Proxy pools are stubbed (per-context plumbing only) until ISS-022.
 - No Celery wiring yet — controller/context manager invoked directly from tests; orchestration lands in M3 (ISS-018).
 
+## ISS-016 — Scoring module (2026-08-23)
+### What was done
+- `pipeline/scoring.py`: `ScoringStrategy` Protocol (deterministic, side-effect-free contract with `name`) + `HeuristicScoring` default implementation.
+- **Difficulty (0–100)** per README weight tables: WAF vendors tiered (tier1 22 / tier2 16 / tier3 10 per vendor, category cap 40), captcha score-based/invisible 20 vs visible challenge 12 (cap 25), fingerprinting libs 7 each (cap 20) + generic canvas/WebGL reads 5, blocked challenge interstitial +10, honeypots +4, CSRF token complexity +3.
+- **Risk (0–100)** misconfiguration penalties: HSTS 20, CSP 20, XFO 10, Referrer-Policy 5, Permissions-Policy 5; cookie flag issue types 6 each (cap 18); password form without CSRF 10; no MFA signal 10.
+- `ScoreResult` carries both scores plus itemized `factors`/`risk_factors`; reasoning string enumerates *every* factor with its point value ("Score 59: waf:akamai_bm (+22), captcha:score_or_invisible (+20)...").
+### Design decisions / deviations
+- Category caps prevent vendor-count inflation dominating the total; contributions clamp at cap boundaries rather than being skipped (3 tier-1 WAFs = exactly 40).
+- Risk treats absent-MFA-signal as a penalty by design (posture score, not a compliance verdict) — documented trade-off.
+- WAF tier map covers known vendors; unknown WAF names default to tier 3 so new detections still contribute.
+### How to verify
+- `pytest tests/test_scoring.py` — 15 tests: table-driven exact scores for every signal class, category caps, total ≤100 bound, clean-page → difficulty 0 / risk from missing headers only, reasoning enumerates all nonzero factors.
+
+## ISS-015 — Report Aggregator (2026-08-23)
+### What was done
+- `pipeline/aggregator.py`: canonical `ScanReport` model (schema_version 1.0) with `auth`/`security`/`antibot`/`artifacts` sections matching the documented GET /v1/scans/{id} response shape. `aggregate()` merges detector findings:
+  - auth: specificity-first conflict resolution with fully deterministic tie-break (**specificity > matched-signal count > confidence > name ascending**); non-primary providers preserved in `other_providers`; flows merged across findings.
+  - security: posture finding mapped onto section fields incl. parsed HSTS/CSP details and raw headers.
+  - antibot: primary captcha (highest confidence) + full list semantics; additive `waf_providers` and `fingerprinting_signals`; `cookies_detected` derived from actual cookie-signal evidence; blocked state + scoring reasoning included.
+- `schemas/report.schema.json` committed (generated from the model, `$id` set); aggregator output validates against it via jsonschema in tests.
+- `pipeline/evidence.py`: boto3 uploader to S3/MinIO producing `s3://bucket/key` refs for HAR/PNG/DOM/trace; `parse_s3_uri`/`download` helpers.
+- `pipeline/persist.py`: idempotent `persist_report()` — updates scans row (status, difficulty_score, security_score, completed_at), replaces findings rows, writes artifacts row.
+### Design decisions / deviations
+- Evidence URIs stored as `s3://` paths for now; presigned HTTPS URLs are ISS-023's concern.
+- persist replaces prior findings per scan (delete+insert in one transaction) so worker retries can't duplicate rows — verified by test.
+### Limitations & known gaps
+- Aggregator assumes ≤1 security posture finding (extra security findings ignored beyond the first).
+- Schema file must be regenerated manually if ScanReport changes (`ScanReport.model_json_schema()`) — CI drift check deferred to M4 hardening.
+### How to verify
+- `pytest tests/test_aggregator.py` — conflict/tie-break determinism, additive WAF/fingerprint collection, schema validation of a realistic report, and a full round-trip against live Postgres + MinIO: upload evidence → persist → read back scan/findings/artifacts rows → download objects byte-identical → re-persist leaves exactly one row per table.
+
+## M2 verification summary (2026-08-23)
+- **75/75 tests pass**; ruff + mypy clean across 33 source files.
+- Full pipeline now proven end-to-end at unit level: findings → aggregate → score → evidence upload → Postgres persistence → readback.
+
+
 

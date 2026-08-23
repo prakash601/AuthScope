@@ -14,7 +14,7 @@
 |---|---|---|---|
 | **M0 — Foundation** | Repo scaffold, dev environment, database | ISS-001 – ISS-004 | ✅ |
 | **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ✅ |
-| **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ⬜ |
+| **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ✅ |
 | **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ⬜ |
 | **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ⬜ |
 
@@ -291,38 +291,38 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 ## M2 — Pipeline & Scoring
 
 ### ISS-015 — Report Aggregator
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Merges all detector findings into one report: deduplication, conflict resolution (e.g., two providers matching — resolve by signal specificity weights), confidence merging, evidence attachment, final report JSON persisted to Postgres.
 
 **Tasks:**
-- [ ] Merge logic per finding category; specificity-weighted conflict resolution
-- [ ] Final report JSON schema (matches GET /v1/scans/{id} response shape)
-- [ ] Persistence to auth/security/antibot findings tables + artifacts rows
-- [ ] Evidence upload: HAR/screenshot/DOM/trace → MinIO/S3 paths recorded in artifacts table
+- [x] Merge logic per finding category; specificity-weighted conflict resolution
+- [x] Final report JSON schema (matches GET /v1/scans/{id} response shape)
+- [x] Persistence to auth/security/antibot findings tables + artifacts rows
+- [x] Evidence upload: HAR/screenshot/DOM/trace → MinIO/S3 paths recorded in artifacts table
 
 **Acceptance criteria:**
-- [ ] Conflicting two-provider fixture resolves deterministically to higher-specificity match (documented tie-break)
-- [ ] Complete report round-trips through DB with all evidence URLs valid (objects retrievable)
-- [ ] Report JSON validates against committed JSON schema file
+- [x] Conflicting two-provider fixture resolves deterministically to higher-specificity match (documented tie-break)
+- [x] Complete report round-trips through DB with all evidence URLs valid (objects retrievable)
+- [x] Report JSON validates against committed JSON schema file
 
 ---
 
 ### ISS-016 — Scoring module (difficulty + risk, heuristic)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Computes Automation Difficulty Score 0–100 (weighted: WAF tier > invisible/score captcha > visible captcha > fingerprinting > behavioral > honeypots) and Risk Score (missing protections), each with itemized plain-English reasoning strings. Written behind an interface so Phase-2 ML models can drop in.
 
 **Tasks:**
-- [ ] Weighted scoring functions per README §Scoring tables
-- [ ] Reasoning generator listing contributing factors ("Score 87: Akamai + invisible Turnstile...")
-- [ ] `ScoringStrategy` protocol (heuristic impl now, XGBoost later)
-- [ ] Scores written to scans row; unit tests pinning score math
+- [x] Weighted scoring functions per README §Scoring tables
+- [x] Reasoning generator listing contributing factors ("Score 87: Akamai + invisible Turnstile...")
+- [x] `ScoringStrategy` protocol (heuristic impl now, XGBoost later)
+- [x] Scores written to scans row; unit tests pinning score math
 
 **Acceptance criteria:**
-- [ ] Table-driven unit tests: known finding sets produce expected exact scores
-- [ ] Empty findings (clean page) → difficulty near 0, risk reflects missing headers only
-- [ ] Reasoning string enumerates every factor contributing >0 weight
+- [x] Table-driven unit tests: known finding sets produce expected exact scores
+- [x] Empty findings (clean page) → difficulty near 0, risk reflects missing headers only
+- [x] Reasoning string enumerates every factor contributing >0 weight
 
 ---
 
