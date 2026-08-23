@@ -1,0 +1,68 @@
+name: authscope
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-authscope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-authscope-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-authscope}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-authscope} -d ${POSTGRES_DB:-authscope}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-authscope-dev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-authscope-dev-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc mb --ignore-existing local/$$S3_BUCKET &&
+      echo 'Bucket ready'
+      "
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-authscope-dev}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-authscope-dev-secret}
+      S3_BUCKET: ${S3_BUCKET:-authscope-artifacts}
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
