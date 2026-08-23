@@ -1,0 +1,418 @@
+# AuthScope — auth provider signatures.
+# Signal keys: script_src | global_object | network | form_action | dom | inline_js | cookie
+# Values are substring patterns matched against the corresponding PageArtifact fields.
+- name: auth0
+  type: auth_provider
+  category: auth
+  confidence: 0.92
+  signals:
+    script_src: "cdn.auth0.com"
+    global_object: ["auth0", "auth0Client", "webAuth"]
+    network: "auth0.com/.well-known/openid-configuration"
+    form_action: "/u/login"
+    dom: "auth0-lock"
+
+- name: firebase_auth
+  type: auth_provider
+  category: auth
+  confidence: 0.93
+  signals:
+    script_src: ["www.gstatic.com/firebasejs", "firebaseio.com"]
+    global_object: ["firebase"]
+    network: ["identitytoolkit.googleapis.com", "securetoken.googleapis.com"]
+    dom: "firebaseui"
+
+- name: okta
+  type: auth_provider
+  category: auth
+  confidence: 0.92
+  signals:
+    script_src: ["oktacdn.com", "global.oktacdn.com"]
+    global_object: ["OktaSignIn", "okta-signin"]
+    form_action: "/login/login.htm"
+    dom: ["okta-sign-in", "okta_auth"]
+
+- name: aws_cognito
+  type: auth_provider
+  category: auth
+  confidence: 0.9
+  signals:
+    script_src: ["amazoncognito.com"]
+    global_object: ["AmazonCognitoIdentity", "AWSCognito"]
+    network: ["cognito-idp.", "cognitoidentity."]
+    dom: "awsui"
+
+- name: clerk
+  type: auth_provider
+  category: auth
+  confidence: 0.93
+  signals:
+    script_src: ["clerk.accounts.dev", "clerk.telemetry", "cdn.clerk.com", "clerk.com"]
+    global_object: ["Clerk", "__clerk"]
+    network: ["clerk.dev/v1/client", "api.clerk.com"]
+    dom: "cl-signin"
+
+- name: azure_ad
+  type: auth_provider
+  category: auth
+  confidence: 0.9
+  signals:
+    script_src: ["secure.aadcdn.microsoftonline-p.com", "aadcdn.msftauth.net", "login.microsoftonline.com"]
+    global_object: ["MSAL", "msal", "Microsoft"]
+    network: ["login.microsoftonline.com/common/oauth2", "login.live.com/ppsecure"]
+    form_action: "/common/login"
+
+- name: adfs
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: "/adfs/portal/script/"
+    network: ["/adfs/ls/", "/adfs/oauth2"]
+    form_action: "/adfs/ls/"
+    dom: "adfs"
+
+- name: onelogin
+  type: auth_provider
+  category: auth
+  confidence: 0.9
+  signals:
+    script_src: ["onelogin.com"]
+    global_object: ["OneLogin"]
+    network: ["onelogin.com/login", "onelogin.com/client/auth"]
+    form_action: "/login"
+
+- name: ping_identity
+  type: auth_provider
+  category: auth
+  confidence: 0.88
+  signals:
+    script_src: ["cdn.pingone.com", "pingone.com"]
+    global_object: ["Ping"]
+    network: ["auth.pingone.com", "sso.connect.pingidentity.com"]
+    dom: "ping"
+
+- name: ping_federate
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: "/pf/images/"
+    network: ["/sp/startSSO.ping", "/idp/startSSO.ping"]
+    dom: "pingfederate"
+
+- name: keycloak
+  type: auth_provider
+  category: auth
+  confidence: 0.9
+  signals:
+    script_src: "/js/keycloak"
+    global_object: ["Keycloak", "keycloak"]
+    network: ["/realms/", "/protocol/openid-connect/"]
+    form_action: "/login-actions/authenticate"
+
+- name: supabase_auth
+  type: auth_provider
+  category: auth
+  confidence: 0.88
+  signals:
+    script_src: ["supabase.co", "supabase.in"]
+    global_object: ["supabase", "_supabase"]
+    network: ["/auth/v1/token", "/auth/v1/signup", "supabase.co/auth"]
+
+- name: workos
+  type: auth_provider
+  category: auth
+  confidence: 0.87
+  signals:
+    script_src: ["workos.com"]
+    network: ["api.workos.com/sso", "auth.workos.com"]
+    form_action: "/sso/authorize"
+
+- name: jumpcloud
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["cdn.jumpcloud.com"]
+    network: ["sso.jumpcloud.com"]
+    form_action: "/sso/login"
+
+- name: duo_security
+  type: auth_provider
+  category: auth
+  confidence: 0.88
+  signals:
+    script_src: ["duo.com", "s3.amazonaws.com/duo_web"]
+    global_object: ["Duo"]
+    network: ["api.duo.com", "/frame/prompt"]
+    dom: "duo_iframe"
+
+- name: forgerock_am
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["forgerock"]
+    network: ["/am/XUI/", "openam"]
+    form_action: "/UI/Login"
+    dom: "forgerock"
+
+- name: gluu
+  type: auth_provider
+  category: auth
+  confidence: 0.82
+  signals:
+    script_src: ["gluu.org"]
+    network: ["/oxauth/", "/jidp/"]
+    form_action: "/oxauth/"
+
+- name: shibboleth_idp
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    network: ["/idp/profile/SAML2", "/idp/Authn/"]
+    form_action: ["/idp/Authn/UserPassword", "/idp/profile/SAML2/Redirect/SSO"]
+    dom: "shibboleth"
+
+- name: simplesamlphp
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: "/simplesaml/"
+    network: ["/simplesaml/module.php/core/loginuserpass.php", "saml2/idp/SSOService.php"]
+    form_action: "saml2/idp/SSOService.php"
+
+- name: casdoor
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["casdoor"]
+    network: ["/api/login", "/api/get-app-login"]
+    dom: "casdoor"
+
+- name: authentik
+  type: auth_provider
+  category: auth
+  confidence: 0.86
+  signals:
+    script_src: ["authentik"]
+    network: ["/flows/-/default/authentication/", "/api/v3/core/"]
+    dom: "ak-flow"
+
+- name: ory_hydra
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    network: ["/oauth2/auth", "/oauth2/token"]
+    script_src: ["hydra"]
+
+- name: ory_kratos
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    network: ["/self-service/login", "/self-service/registration", "/sessions/whoami"]
+    dom: "kratos"
+
+- name: fusionauth
+  type: auth_provider
+  category: auth
+  confidence: 0.86
+  signals:
+    script_src: ["fusionauth"]
+    network: ["/oauth2/authorize", "/api/login"]
+    dom: "fusionauth"
+
+- name: idaptive
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["idaptive.app", "centrify"]
+    network: ["/my.login", "/security/startauthenticate"]
+    form_action: "/my.login"
+
+- name: cyberark_identity
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["cyberark.identity", "idsapp.com"]
+    network: ["/Security/StartAuthentication", "/oauth2/authorize"]
+    dom: "cyberark"
+
+- name: oracle_identity_cloud
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    script_src: ["identity.oraclecloud.com", "oraclecloud.com/sso"]
+    network: ["/oauth2/v1/authorize", "/sso/v1/sdk/authenticate"]
+    form_action: "/sso/idp"
+
+- name: ibm_security_verify
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["cloud.ibm.com/idaas", "verify.ibm.com"]
+    network: ["/oidc/endpoint/", "/idaas/mtk"]
+    dom: "ibm-sso"
+
+- name: salesforce_identity
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["force.com", "salesforce.com"]
+    network: ["salesforce.com/services/oauth2/authorize"]
+    form_action: "/Secure/Login.jsp"
+
+- name: sap_cloud_identity
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    script_src: ["accounts.ondemand.com", "sapcloud"]
+    network: ["/saml2/idp/sso", "/oauth2/authorize"]
+    form_action: "/saml2/idp/sso"
+
+- name: vmware_workspace_one
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["vmwareidentity", "air-watch"]
+    network: ["/SAAS/API/1.0/POST/login", "/SAAS/auth"]
+    form_action: "/SAAS/auth"
+
+- name: miniorange
+  type: auth_provider
+  category: auth
+  confidence: 0.8
+  signals:
+    script_src: ["miniorange", "mini-orange"]
+    network: ["login.xecurify.com"]
+    dom: "mo_saml"
+
+- name: stytch
+  type: auth_provider
+  category: auth
+  confidence: 0.87
+  signals:
+    script_src: ["js.stytch.com", "stytch.com"]
+    global_object: ["Stytch", "$stytch"]
+    network: ["telemetry.stytch.com", "web.stytch.com/api"]
+
+- name: magic_link_magic
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["magic.link"]
+    global_object: ["Magic"]
+    network: ["auth.magic.link"]
+
+- name: descope
+  type: auth_provider
+  category: auth
+  confidence: 0.86
+  signals:
+    script_src: ["descope.com"]
+    global_object: ["Descope"]
+    network: ["api.descope.com"]
+
+- name: frontegg
+  type: auth_provider
+  category: auth
+  confidence: 0.86
+  signals:
+    script_src: ["frontegg.com"]
+    global_object: ["Frontegg"]
+    network: ["frontegg.com/oauth", "frontegg.com/identity/resources"]
+
+- name: boxyhq_saml_jackson
+  type: auth_provider
+  category: auth
+  confidence: 0.82
+  signals:
+    script_src: ["boxyhq"]
+    network: ["/api/oauth/authorize", "/api/oauth/jackson"]
+    dom: "jackson"
+
+- name: zitadel
+  type: auth_provider
+  category: auth
+  confidence: 0.85
+  signals:
+    script_src: ["zitadel"]
+    network: ["/oauth/v2/authorize", "/oidc/v1/authorize"]
+
+- name: logto
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    script_src: ["logto"]
+    network: ["/oidc/auth", "/api/interaction"]
+    dom: "logto"
+
+- name: authgear
+  type: auth_provider
+  category: auth
+  confidence: 0.84
+  signals:
+    script_src: ["authgear"]
+    network: ["/_authgear/", "/oauth2/authorize"]
+
+- name: hanko
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["hanko.io", "@teamhanko"]
+    network: ["/webauthn/login/start", "/passkey/login"]
+    dom: "hanko"
+
+- name: passage_id
+  type: auth_provider
+  category: auth
+  confidence: 0.83
+  signals:
+    script_src: ["psg.io", "passage.id"]
+    global_object: ["Passage"]
+    network: ["api.psg.io/v1"]
+
+- name: kerberos_negotiate
+  type: auth_provider
+  category: auth
+  confidence: 0.75
+  signals:
+    dom: "negotiate"
+    network: "/Negotiate"
+
+- name: generic_oidc_wellknown
+  type: auth_provider
+  category: auth
+  confidence: 0.6
+  signals:
+    network: ".well-known/openid-configuration"
+
+- name: generic_oauth_authorize
+  type: auth_provider
+  category: auth
+  confidence: 0.55
+  signals:
+    network: "/oauth/authorize"
+
+- name: generic_oauth2_authorize
+  type: auth_provider
+  category: auth
+  confidence: 0.55
+  signals:
+    network: "/oauth2/authorize"

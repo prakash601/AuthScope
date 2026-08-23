@@ -13,7 +13,7 @@
 | Milestone | Scope | Issues | Status |
 |---|---|---|---|
 | **M0 — Foundation** | Repo scaffold, dev environment, database | ISS-001 – ISS-004 | ✅ |
-| **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ⬜ |
+| **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ✅ |
 | **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ⬜ |
 | **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ⬜ |
 | **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ⬜ |
@@ -99,173 +99,173 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 ## M1 — Core Detection Engine
 
 ### ISS-005 — Browser Context Manager
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Playwright-based manager producing isolated browser contexts with per-scan fingerprint (rotated real UA, randomized viewport), proxy assignment, tracing enabled, and hard 45s lifecycle kill. `ignore_https_errors=False`.
 
 **Tasks:**
-- [ ] `BrowserContextManager.get_context(proxy_url, fingerprint)` per LLD
-- [ ] Fingerprint generator: UA dataset rotation, viewport randomization, locale/timezone
-- [ ] Stealth patches: disable `navigator.webdriver`
-- [ ] Context lifecycle: acquire/release, RAM guard, 45s watchdog kill
-- [ ] Playwright tracing start/stop wired to context
+- [x] `BrowserContextManager.get_context(proxy_url, fingerprint)` per LLD
+- [x] Fingerprint generator: UA dataset rotation, viewport randomization, locale/timezone
+- [x] Stealth patches: disable `navigator.webdriver`
+- [x] Context lifecycle: acquire/release, RAM guard, 45s watchdog kill
+- [x] Playwright tracing start/stop wired to context
 
 **Acceptance criteria:**
-- [ ] Integration test launches context against a local test page, collects title, releases cleanly
-- [ ] Watchdog kills a hung context within 45s (test with artificial stall)
-- [ ] Two concurrent contexts have distinct UA + viewport
+- [x] Integration test launches context against a local test page, collects title, releases cleanly
+- [x] Watchdog kills a hung context within 45s (test with artificial stall)
+- [x] Two concurrent contexts have distinct UA + viewport
 
 ---
 
 ### ISS-006 — Page Controller & network interception (CDP)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Navigates pages and captures the complete request/response record: enable CDP Network/Page/Security domains, HAR capture, response headers, Set-Cookie parsing, certificate/security details.
 
 **Tasks:**
-- [ ] `PageController.goto(url, wait="networkidle")` + configurable extra 5s lazy-captcha wait
-- [ ] CDP session attach; subscribe request/requestWillBeSent/responseReceived events
-- [ ] HAR generation (Playwright HAR or manual assembly from captured events)
-- [ ] Cookie store snapshot post-load
-- [ ] Screenshot (full-page PNG) capture
-- [ ] Timeout/blocked-page detection (interstitials, challenge pages) surfaced as scan state
+- [x] `PageController.goto(url, wait="networkidle")` + configurable extra 5s lazy-captcha wait
+- [x] CDP session attach; subscribe request/requestWillBeSent/responseReceived events
+- [x] HAR generation (Playwright HAR or manual assembly from captured events)
+- [x] Cookie store snapshot post-load
+- [x] Screenshot (full-page PNG) capture
+- [x] Timeout/blocked-page detection (interstitials, challenge pages) surfaced as scan state
 
 **Acceptance criteria:**
-- [ ] Against a local fixture site: every request/response (incl. XHR/fetch triggered by scripts) is captured with headers
-- [ ] HAR file is valid JSON and loadable by HAR viewers
-- [ ] Screenshot PNG produced non-empty
-- [ ] A page served with 403 + challenge HTML results in detected state, not silent success
+- [x] Against a local fixture site: every request/response (incl. XHR/fetch triggered by scripts) is captured with headers
+- [x] HAR file is valid JSON and loadable by HAR viewers
+- [x] Screenshot PNG produced non-empty
+- [x] A page served with 403 + challenge HTML results in detected state, not silent success
 
 ---
 
 ### ISS-007 — Runtime analyzer (early JS hooks)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Injects hooks via `evaluateOnNewDocument` before any page script runs, recording all fetch/XHR calls and probing global objects — capturing signals static analysis can't see.
 
 **Tasks:**
-- [ ] Wrap `window.fetch` and `XMLHttpRequest.open/send` to log method+URL+initiator
-- [ ] Periodic/global-object probe: collect enumerable `window` properties of interest at load-complete
-- [ ] Hook buffer drained into artifact at scan end (survives navigation via injection per frame)
-- [ ] Ensure hooks are non-breaking (try/catch guards, never alter page behavior)
+- [x] Wrap `window.fetch` and `XMLHttpRequest.open/send` to log method+URL+initiator
+- [x] Periodic/global-object probe: collect enumerable `window` properties of interest at load-complete
+- [x] Hook buffer drained into artifact at scan end (survives navigation via injection per frame)
+- [x] Ensure hooks are non-breaking (try/catch guards, never alter page behavior)
 
 **Acceptance criteria:**
-- [ ] Fixture page making fetch/XHR on load shows all calls in hook log with correct URLs
-- [ ] Hooks active before first third-party script executes (verified ordering)
-- [ ] Pages with CSP still function normally with hooks injected (no console errors caused by us beyond CSP reports we control)
+- [x] Fixture page making fetch/XHR on load shows all calls in hook log with correct URLs
+- [x] Hooks active before first third-party script executes (verified ordering)
+- [x] Pages with CSP still function normally with hooks injected (no console errors caused by us beyond CSP reports we control)
 
 ---
 
 ### ISS-008 — Static analyzer (DOM/scripts/meta)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Extracts everything needed for DOM-level detection: form elements/actions/inputs, script src list, inline script text, hidden inputs (CSRF/honeypot candidates), meta tags, iframe sources, autocomplete attributes.
 
 **Tasks:**
-- [ ] DOM serialization snapshot (post-load)
-- [ ] Extractors: forms (+action/method/fields), script srcs, inline JS blobs, iframes, metas
-- [ ] Honeypot heuristics inputs (hidden/offscreen/naming patterns) — detection itself lives in detectors
-- [ ] PII stripping pass over stored DOM snapshot (emails, phone patterns, token-like params redacted)
+- [x] DOM serialization snapshot (post-load)
+- [x] Extractors: forms (+action/method/fields), script srcs, inline JS blobs, iframes, metas
+- [x] Honeypot heuristics inputs (hidden/offscreen/naming patterns) — detection itself lives in detectors
+- [x] PII stripping pass over stored DOM snapshot (emails, phone patterns, token-like params redacted)
 
 **Acceptance criteria:**
-- [ ] Fixture login page yields correct form action, input list, script list
-- [ ] Hidden input with name "bot-field" flagged as honeypot candidate
-- [ ] Stored DOM contains zero raw email addresses (test with planted ones)
+- [x] Fixture login page yields correct form action, input list, script list
+- [x] Hidden input with name "bot-field" flagged as honeypot candidate
+- [x] Stored DOM contains zero raw email addresses (test with planted ones)
 
 ---
 
 ### ISS-009 — PageArtifact model
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** The single immutable data object passed to all detectors, unifying outputs of ISS-006/007/008: requests, responses, headers, cookies, globals, DOM structures, screenshot ref, timing.
 
 **Tasks:**
-- [ ] Pydantic models: `PageArtifact` + nested types (`CapturedRequest`, `CookieInfo`, `DomSummary`, `GlobalProbe`)
-- [ ] Factory/builder aggregating collector outputs
-- [ ] Serialization to/from JSON (for persistence + future AI microservices consuming artifacts)
+- [x] Pydantic models: `PageArtifact` + nested types (`CapturedRequest`, `CookieInfo`, `DomSummary`, `GlobalProbe`)
+- [x] Factory/builder aggregating collector outputs
+- [x] Serialization to/from JSON (for persistence + future AI microservices consuming artifacts)
 
 **Acceptance criteria:**
-- [ ] End-to-end test: navigate fixture site → build artifact → serialize → deserialize losslessly
-- [ ] Artifact JSON schema documented (docstrings/example committed)
+- [x] End-to-end test: navigate fixture site → build artifact → serialize → deserialize losslessly
+- [x] Artifact JSON schema documented (docstrings/example committed)
 
 ---
 
 ### ISS-010 — Signature system (YAML → Postgres → worker cache) + initial signatures
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** The hot-reloadable signature pipeline plus the seed content: ~40 auth provider signatures and top antibot/captcha/WAF/fingerprinting signatures in YAML format per README.
 
 **Tasks:**
-- [ ] YAML schema definition + validation (name, category, type, confidence, signals dict, version)
-- [ ] Loader: parse YAML dir → upsert into `signatures` table with version bump, active flag
-- [ ] Worker-side in-memory cache with atomic reload (CRON/push trigger stub)
-- [ ] Seed files: `signatures/auth.yaml` (auth0, firebase, okta, cognito, clerk, azure_ad, keycloak, onelogin, ping, supabase, workos, etc.), `signatures/antibot.yaml` (cloudflare, datadome, perimeterx, akamai, kasada, imperva), `signatures/captcha.yaml` (recaptcha v2/v3, hcaptcha, turnstile, arkose, geetest), `signatures/fingerprinting.yaml` (fingerprintjs, castle, sift, creepjs)
-- [ ] CLI: `python -m db.load_signatures`
+- [x] YAML schema definition + validation (name, category, type, confidence, signals dict, version)
+- [x] Loader: parse YAML dir → upsert into `signatures` table with version bump, active flag
+- [x] Worker-side in-memory cache with atomic reload (CRON/push trigger stub)
+- [x] Seed files: `signatures/auth.yaml` (auth0, firebase, okta, cognito, clerk, azure_ad, keycloak, onelogin, ping, supabase, workos, etc.), `signatures/antibot.yaml` (cloudflare, datadome, perimeterx, akamai, kasada, imperva), `signatures/captcha.yaml` (recaptcha v2/v3, hcaptcha, turnstile, arkose, geetest), `signatures/fingerprinting.yaml` (fingerprintjs, castle, sift, creepjs)
+- [x] CLI: `python -m db.load_signatures`
 
 **Acceptance criteria:**
-- [ ] All seed YAML validates against schema; ≥40 auth provider entries present
-- [ ] Loading twice bumps version once and doesn't duplicate rows (idempotent)
-- [ ] Runtime test: add a dummy signature to YAML → trigger reload → new detector run matches it without process restart
+- [x] All seed YAML validates against schema; ≥40 auth provider entries present
+- [x] Loading twice bumps version once and doesn't duplicate rows (idempotent)
+- [x] Runtime test: add a dummy signature to YAML → trigger reload → new detector run matches it without process restart
 
 ---
 
 ### ISS-011 — Detector interface + parallel pipeline runner
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** The strategy-pattern core: `Detector` ABC taking `PageArtifact` returning findings; async runner executing all registered detectors concurrently with isolation (one detector's crash doesn't fail the scan).
 
 **Tasks:**
-- [ ] `Detector(ABC)` with `detect(artifact) -> list[Finding]`; `Finding` model with signal evidence
-- [ ] Registry + `asyncio.gather` runner with per-detector timeout and exception containment
-- [ ] Structured logging per detector (duration, finding counts)
+- [x] `Detector(ABC)` with `detect(artifact) -> list[Finding]`; `Finding` model with signal evidence
+- [x] Registry + `asyncio.gather` runner with per-detector timeout and exception containment
+- [x] Structured logging per detector (duration, finding counts)
 
 **Acceptance criteria:**
-- [ ] Runner test with mock detectors: all run concurrently, one raising exception yields partial findings not scan failure
-- [ ] Per-detector timeout enforced (mock slow detector cut off)
+- [x] Runner test with mock detectors: all run concurrently, one raising exception yields partial findings not scan failure
+- [x] Per-detector timeout enforced (mock slow detector cut off)
 
 ---
 
 ### ISS-012 — AuthProviderDetector
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Matches auth provider signatures across all four signal classes (script_src, global_object, network, form_action); correlates multi-signal hits into a confidence-scored provider + flows finding (oauth/saml/password/magic-link/webauthn/otp).
 
 **Tasks:**
-- [ ] Signal matching engine for auth category signatures (substring/regex per signal type)
-- [ ] Flow inference rules (redirect chain to /authorize → oauth_code; password input + POST → password; navigator.credentials publicKey call → webauthn; etc.)
-- [ ] Confidence computation: independent corroborating signals boost; single weak signal caps low
-- [ ] Evidence payload: matched signals with exact matched values
+- [x] Signal matching engine for auth category signatures (substring/regex per signal type)
+- [x] Flow inference rules (redirect chain to /authorize → oauth_code; password input + POST → password; navigator.credentials publicKey call → webauthn; etc.)
+- [x] Confidence computation: independent corroborating signals boost; single weak signal caps low
+- [x] Evidence payload: matched signals with exact matched values
 
 **Acceptance criteria:**
-- [ ] Fixture pages emulating Auth0 (script+global+network signals) detect `auth0` ≥0.9 confidence
-- [ ] Single-signal-only fixture yields lower confidence, still attributed correctly
-- [ ] OAuth redirect-chain fixture classified with flow `oauth_code`
-- [ ] No-provider fixture yields `custom`/`unknown` finding, not false positive
+- [x] Fixture pages emulating Auth0 (script+global+network signals) detect `auth0` ≥0.9 confidence
+- [x] Single-signal-only fixture yields lower confidence, still attributed correctly
+- [x] OAuth redirect-chain fixture classified with flow `oauth_code`
+- [x] No-provider fixture yields `custom`/`unknown` finding, not false positive
 
 ---
 
 ### ISS-013 — SecurityDetector
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Full security header audit, cookie flag analysis, CSRF token presence, honeypot confirmation, autocomplete analysis, MFA heuristics → structured security finding.
 
 **Tasks:**
-- [ ] Header audit: HSTS (+max-age/includeSubDomains/preload parsing), CSP (directive breakdown), XFO, COOP/CORP/COEP, Permissions-Policy, Referrer-Policy
-- [ ] Set-Cookie parser: Secure/HttpOnly/SameSite/expiry/domain on session-relevant cookies
-- [ ] CSRF detection: hidden token inputs (naming/dentropy patterns), meta csrf-token, double-submit cookie pattern
-- [ ] Honeypot confirmation combining static analyzer candidates
-- [ ] Password policy hints from inline JS validation patterns; MFA heuristic signals
+- [x] Header audit: HSTS (+max-age/includeSubDomains/preload parsing), CSP (directive breakdown), XFO, COOP/CORP/COEP, Permissions-Policy, Referrer-Policy
+- [x] Set-Cookie parser: Secure/HttpOnly/SameSite/expiry/domain on session-relevant cookies
+- [x] CSRF detection: hidden token inputs (naming/dentropy patterns), meta csrf-token, double-submit cookie pattern
+- [x] Honeypot confirmation combining static analyzer candidates
+- [x] Password policy hints from inline JS validation patterns; MFA heuristic signals
 
 **Acceptance criteria:**
-- [ ] Fixture with full header set → all flags true with parsed values; missing-header fixture → flags false
-- [ ] Cookie without HttpOnly/Secure correctly reported in cookie_flags JSONB
-- [ ] CSRF hidden input fixture detected; honeypot fixture distinguished from CSRF token
-- [ ] Output maps 1:1 onto `security_findings` table columns
+- [x] Fixture with full header set → all flags true with parsed values; missing-header fixture → flags false
+- [x] Cookie without HttpOnly/Secure correctly reported in cookie_flags JSONB
+- [x] CSRF hidden input fixture detected; honeypot fixture distinguished from CSRF token
+- [x] Output maps 1:1 onto `security_findings` table columns
 
 ---
 
 ### ISS-014 — CaptchaDetector, WAFDetector, FingerprintDetector *(parallelizable internally)*
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** The three anti-bot detectors:
 - **CaptchaDetector**: vendor + variant (recaptcha_v2_checkbox/invisible, recaptcha_v3_score, hcaptcha, turnstile_managed/invisible, arkose, geetest_v3/v4), visible vs invisible, score vs challenge
@@ -273,18 +273,18 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 - **FingerprintDetector**: FingerprintJS/FPJS Pro, Castle, Sift, CreepJS, vendor sensor SDK endpoints, canvas/WebGL fingerprint reads
 
 **Tasks:**
-- [ ] Three detectors implementing Detector ABC against antibot/captcha/fingerprinting signature sets
-- [ ] Captcha visibility classification (DOM widget presence/rendered size vs script-only = invisible)
-- [ ] Score-vs-challenge classification (v3 always-running vs v2 event-driven markers)
-- [ ] WAF interstitial fingerprints (title/body markers of Cloudflare/Kasada/PX challenge pages)
-- [ ] Blocked-scan handling: challenge-on-first-response sets scan outcome `waf_blocked` with partial findings
+- [x] Three detectors implementing Detector ABC against antibot/captcha/fingerprinting signature sets
+- [x] Captcha visibility classification (DOM widget presence/rendered size vs script-only = invisible)
+- [x] Score-vs-challenge classification (v3 always-running vs v2 event-driven markers)
+- [x] WAF interstitial fingerprints (title/body markers of Cloudflare/Kasada/PX challenge pages)
+- [x] Blocked-scan handling: challenge-on-first-response sets scan outcome `waf_blocked` with partial findings
 
 **Acceptance criteria:**
-- [ ] Each vendor has a fixture page; detector identifies correct vendor+variant on each
-- [ ] Turnstile invisible fixture → `captcha_visible=false`; reCAPTCHA v2 checkbox fixture → true
-- [ ] Cloudflare challenge-page fixture → WAF=cloudflare + interstitial recognized
+- [x] Each vendor has a fixture page; detector identifies correct vendor+variant on each
+- [x] Turnstile invisible fixture → `captcha_visible=false`; reCAPTCHA v2 checkbox fixture → true
+- [x] Cloudflare challenge-page fixture → WAF=cloudflare + interstitial recognized
 - [ `__cf_bm` cookie alone (no headers) still attributes cloudflare via cookie signal
-- [ ] All three run under the ISS-011 pipeline without interference
+- [x] All three run under the ISS-011 pipeline without interference
 
 ---
 

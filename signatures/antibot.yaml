@@ -1,0 +1,85 @@
+# AuthScope — WAF / bot-protection signatures.
+- name: cloudflare
+  type: waf
+  category: antibot
+  confidence: 0.9
+  signals:
+    header: ["server: cloudflare", "cf-ray:", "cf-cache-status:"]
+    cookie: ["__cf_bm", "cf_chl_", "__cfruid"]
+    dom: ["challenge-platform", "cf-challenge"]
+    network: ["challenges.cloudflare.com/cdn-cgi/challenge-platform"]
+
+- name: datadome
+  type: waf
+  category: antibot
+  confidence: 0.92
+  signals:
+    header: ["x-datadome", "server: datadome"]
+    cookie: ["_datadome"]
+    script_src: ["js.datadome.co", "api-js.datadome.co", "datadome.co/tags.js"]
+
+- name: perimeterx_human
+  type: waf
+  category: antibot
+  confidence: 0.9
+  signals:
+    header: ["x-px-", "_pxhd"]
+    cookie: ["_px3", "_px2", "_pxhd", "_pxvid"]
+    script_src: ["px-cdn.net", "px-client.net", "client.px-cdn.net"]
+    dom: ["px-captcha", "px-block"]
+
+- name: akamai_bm
+  type: waf
+  category: antibot
+  confidence: 0.9
+  signals:
+    header: ["x-akamai-transformed", "akamai-grn", "server: akamaighost"]
+    cookie: ["_abck", "ak_bmsc", "bm_sv", "bm_mi"]
+    script_src: ["client.akamai.com", "akstat.io", "go-mpulse.net"]
+    dom: ["bm-telemetry"]
+
+- name: kasada
+  type: waf
+  category: antibot
+  confidence: 0.9
+  signals:
+    cookie: ["kpsdk_ct", "kpsdk_t", "_kp_uid"]
+    script_src: ["js.kasada.io", "ips.js"]
+    dom: ["kp-challenge", "kasada"]
+    network: ["kpsdk"]
+
+- name: imperva_incapsula
+  type: waf
+  category: antibot
+  confidence: 0.9
+  signals:
+    header: ["x-iinfo", "x-cdn: incapsula"]
+    cookie: ["incap_ses_", "visid_incap_", "___utmvc"]
+    script_src: ["/_Incapsula_Resource"]
+    dom: ["_Incapsula_Resource"]
+
+- name: f5_shape
+  type: waf
+  category: antibot
+  confidence: 0.85
+  signals:
+    cookie: ["rl_session", "rl_anonymousid", "_shcpid"]
+    script_src: ["shape-security", "secureserver.net/speedcurve", "f5.com"]
+    dom: ["shape_security"]
+
+- name: radware
+  type: waf
+  category: antibot
+  confidence: 0.82
+  signals:
+    header: ["x-rdwr", "server: radware"]
+    cookie: ["rdwr_id"]
+
+- name: netacea
+  type: waf
+  category: antibot
+  confidence: 0.82
+  signals:
+    cookie: ["_mitm", "netacea"]
+    script_src: ["netacea"]
+    header: ["x-netacea"]

@@ -1,0 +1,91 @@
+# AuthScope — captcha signatures. variant encodes visible/invisible + score/challenge in `name`.
+- name: recaptcha_v2_checkbox
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.93
+  signals:
+    script_src: ["www.google.com/recaptcha/api.js", "recaptcha/releases"]
+    dom: ["g-recaptcha", "google.com/recaptcha/api2/anchor"]
+
+- name: recaptcha_v2_invisible
+  type: captcha
+  variant: challenge_invisible
+  category: captcha
+  confidence: 0.88
+  signals:
+    script_src: "recaptcha/api.js?onload"
+    inline_js: ["g-recaptcha-badges", "grecaptcha.render"]
+    dom: "g-recaptcha-badges"
+
+- name: recaptcha_v3_score
+  type: captcha
+  variant: score
+  category: captcha
+  confidence: 0.9
+  signals:
+    script_src: "recaptcha/api.js?render="
+    inline_js: ["grecaptcha.execute", "grecaptcha.ready"]
+
+- name: recaptcha_enterprise_score
+  type: captcha
+  variant: score
+  category: captcha
+  confidence: 0.88
+  signals:
+    script_src: ["recaptcha-enterprise", "recaptcha.net/recaptcha/enterprise"]
+    inline_js: ["grecaptcha.enterprise"]
+
+- name: hcaptcha
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.92
+  signals:
+    script_src: ["js.hcaptcha.com/1/api.js", "hcaptcha.com/1/"]
+    dom: ["h-captcha", "hcaptcha.com/1/captcha"]
+
+- name: turnstile_managed
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.94
+  signals:
+    script_src: "challenges.cloudflare.com/turnstile"
+    dom: ["cf-turnstile", "cf_chl_opt"]
+
+- name: turnstile_non_interactive
+  type: captcha
+  variant: challenge_invisible
+  category: captcha
+  confidence: 0.85
+  signals:
+    script_src: "challenges.cloudflare.com/turnstile"
+    inline_js: ["appearance: 'interaction-only'", "execution: 'execute'"]
+
+- name: arkose_funaptcha
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.9
+  signals:
+    script_src: ["client-api.arkoselabs.com", "funcaptcha.com", "arkoselabs"]
+    dom: ["funcaptcha", "arkose"]
+
+- name: geetest_v3
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.86
+  signals:
+    script_src: ["static.geetest.com", "api.geetest.com"]
+    dom: ["geetest_radar_tip", "gt_slider"]
+
+- name: geetest_v4
+  type: captcha
+  variant: challenge_visible
+  category: captcha
+  confidence: 0.86
+  signals:
+    script_src: ["gt4.geetest.com", "geetest.com/v4"]
+    dom: ["geetest_box", "captcha-box"]

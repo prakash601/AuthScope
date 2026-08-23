@@ -79,3 +79,116 @@
 - `pytest tests/test_models_roundtrip.py -v` passes against compose Postgres.
 - `python -m db.seed` prints seeded key; rerun prints "already seeded".
 
+## ISS-005 — Browser Context Manager (2026-08-23)
+### What was done
+- `engine/fingerprints.py`: `FingerprintGenerator` producing per-scan fingerprints from a real-UA dataset (8 Chrome/Firefox/Safari/Edge strings), viewport pool, locale + timezone pools; `to_context_kwargs()` maps to Playwright context options with matching `Accept-Language`.
+- `engine/browser/context_manager.py`: `BrowserContextManager` owning one Chromium instance (`--disable-blink-features=AutomationControlled`), `acquire()` → `ManagedContext` (id, fingerprint, proxy, trace path), `release()` / watchdog kill.
+- Per-context: stealth init script (`navigator.webdriver` undefined, plugins/languages patches), tracing started, `ignore_https_errors=False` per design.
+- Watchdog task force-closes any context alive past `timeout_seconds` (settings-driven, injectable for tests) and removes it from the live registry.
+### Design decisions / deviations
+- Proxy-per-context requires launching Chromium with a `{server: http://per-context}` placeholder when proxies are enabled; manager takes `proxy_enabled` flag at start. No real residential proxy integration yet (M3/ISS-022 scope).
+- Traces saved to tempdir zips on graceful release; skipped on watchdog kill (context may be wedged).
+### Limitations & known gaps
+- Stealth is basic (webdriver/plugins); not equivalent to playwright-stealth forks — flagged for hardening pass in ISS-029.
+- Firefox/WebKit not supported by the per-context proxy path; Chromium-only.
+### How to verify
+- `pytest tests/test_browser_integration.py::test_watchdog_kills_hung_context` — context reaped within ~6s of a 5s watchdog.
+- `test_context_lifecycle_and_distinct_fingerprints` — acquire/release accounting and distinct fingerprints.
+
+## ISS-006 — Page Controller & network interception (2026-08-23)
+### What was done
+- `engine/page/controller.py`: `PageController.run(managed, url)` → `CaptureResult(artifact, screenshot_png, har_json)`.
+- CDP sessions opened with Network/Page/Security enabled; capture via Playwright request/response events into `CapturedRequest` entries (method, resource_type, both header sets, status, `is_xhr_fetch` flag).
+- Main-document response tracked separately (status + headers) and drives `artifact.headers`; final URL after redirects recorded.
+- Blocked/challenge detection: 403 status or known interstitial markers ("just a moment", cf-challenge, press & hold, Incapsula...) sets `blocked` + reason.
+- HAR 1.2 assembly from captured entries (`build_har`) + full-page screenshot bytes.
+### Design decisions / deviations
+- Collected via Playwright events rather than raw CDP event streams — same coverage, cross-browser-safe; CDP domains still enabled as designed for future body/cert needs.
+- Response bodies are not captured (HAR has headers/status only). Needed for deep-scan JS analysis later.
+- Navigation failures (DNS/timeout/net-error) still yield partial evidence instead of failing the scan.
+### How to verify
+- `pytest tests/test_browser_integration.py -k "interception or xhr or har or headers or blocked"`.
+
+## ISS-007 — Runtime analyzer (early JS hooks) (2026-08-23)
+### What was done
+- `engine/page/hooks.py`: `HOOKS_JS` injected via `add_init_script` before any page script: wraps `window.fetch` and `XMLHttpRequest.open/send`, logs method+URL(+status) to `window.__authscope.hookLog`; wraps canvas `toDataURL`/`getImageData` and WebGL `readPixels` into `fingerprintReads` counters.
+- `drain_hooks_js()` returns-and-clears collected data at scan end; all wrappers guarded so they never alter page behavior.
+- Controller drains hooks into `artifact.hook_log` and `artifact.fingerprint_reads`.
+### Design decisions / deviations
+- Hooks injected per-page (controller), not per-context, so each scan starts with clean buffers even if contexts were reused.
+### Limitations & known gaps
+- Hook log capped at 2000 entries per scan.
+- Only fetch/XHR/canvas/WebGL instrumented; WebSocket and EventSource wrapping deferred.
+### How to verify
+- `test_early_hooks_run_before_page_scripts_and_survive_csp` proves hooks run under a strict-CSP page and still capture fetch; `test_hook_log_fetch_and_xhr` covers XHR path.
+
+## ISS-008 — Static analyzer (2026-08-23)
+### What was done
+- `engine/page/static_analyzer.py`: single `EXTRACT_DOM_JS` evaluation returning title, serialized HTML (2MB cap), forms with resolved absolute actions + field metadata (name/type/autocomplete/maxlength/hidden/value-sample), script srcs, inline script samples (2KB cap), iframe srcs, metas, body text sample.
+- Honeypot detection in-page: hidden type excluded (those are CSRF candidates); visible-but-invisible fields flagged via computed style (display/visibility/offscreen/tiny size/aria-hidden+tabindex).
+- PII stripping over stored DOM/text: emails, phone numbers, JWT-like tokens redacted before persistence.
+### How to verify
+- `test_honeypot_candidate_flagged` (bot-field caught, CSRF-style hidden inputs not), `test_pii_stripped_from_dom_snapshot` (email/JWT/phone redacted), `test_static_analyzer_extraction`.
+
+## ISS-009 — PageArtifact model (2026-08-23)
+### What was done
+- `engine/artifacts.py`: typed Pydantic models — `CapturedRequest`, `CookieInfo`, `FormField/FormInfo`, `MetaInfo`, `DomSummary`, and aggregate `PageArtifact` (+ blocked/blocked_reason/load timing, hook log, fingerprint reads, evidence refs). Docstring documents the JSON shape.
+### How to verify
+- `test_artifact_roundtrip_serialization` — real browser capture serializes/deserializes losslessly.
+
+## ISS-010 — Signature system + seed signatures (2026-08-23)
+### What was done
+- `engine/signatures.py`: `SignatureDef` Pydantic validation (categories auth/antibot/captcha/fingerprinting, confidence bounds, non-empty signals with automatic empty-entry pruning), YAML directory loader with duplicate-name rejection, definition-hash based DB sync (insert v1 / no-op unchanged / bump version on change), `SignatureCache` with atomic category swap + revision counter and `areload_from_db()`.
+- Seed signature files: **46 auth providers** (auth0, firebase, okta, cognito, clerk, azure_ad, adfs, keycloak, supabase, workos, stytch, descope, frontegg, zitadel, logto, hanko, passage, plus generic OIDC/OAuth fallbacks), **9 WAFs**, **10 captchas** (with variant metadata), **9 fingerprinting** = **74 total**.
+- `db/load_signatures.py` CLI; loaded live into Postgres (verified counts per category; second run idempotent).
+### Design decisions / deviations
+- Signal keys standardized across categories: script_src, global_object, network, hook_network, form_action, dom, inline_js, cookie, header, body_text, iframe_src — one matcher serves all detectors.
+- Generic OIDC/OAuth fallback signatures carry low confidence and lose conflict-resolution to vendor-specific matches.
+### Limitations & known gaps
+- CRON-based auto-refresh worker not wired (cache exposes reload; Celery beat schedule comes with M3 workers).
+- Signature values are curated substrings; regex support reserved via `re:` prefix (untested path).
+### How to verify
+- `pytest tests/test_signature_system.py` — seed validation (≥40 auth), dupes/invalid rejected, DB idempotency + version bump on change, hot-reload end-to-end (YAML→DB→cache→CaptchaDetector matches brand-new signature without restart).
+
+## ISS-011 — Detector interface + parallel pipeline runner (2026-08-23)
+### What was done
+- `engine/detectors/base.py`: `Detector` ABC (`detect(artifact) -> list[Finding]`), `Finding`/`MatchedSignal` models, signal extractor table mapping every signal key to artifact fields, `match_signature()` with boundary-aware matching for form_action (so `/login` doesn't match `/login_check`), and `confidence_for_signals()` scaling base confidence by corroborating independent signals (1→70%, 2→85%, ≥3→100%).
+- `pipeline/runner.py`: concurrent execution via `asyncio.gather`, per-detector timeout, full fault isolation (crash/timeout → outcome with error, scan continues), duration metrics logged.
+### How to verify
+- `tests/test_pipeline_runner.py`: concurrency results, crash containment, timeout enforcement.
+
+## ISS-012 — AuthProviderDetector (2026-08-23)
+### What was done
+- Multi-signal correlation across all auth signatures; specificity-first conflict resolution (vendor beats generic fallback, then signal count, then confidence).
+- Flow inference: oauth_code (authorize/oauth2/client_id/openid-configuration URLs), saml (SAMLRequest), password (password input), webauthn (PublicKeyCredential global / navigator.credentials inline JS), magic_link (text heuristics + password-less form), otp (autocomplete=one-time-code / short numeric code fields).
+- No-match + login-form present → `custom` finding; generic-OIDC-only match + custom form → `custom` with explanatory note. Flows attached to provider finding with small confidence boost.
+### How to verify
+- `tests/test_detectors.py::test_auth0_*` (multi ≥0.9 vs single lower), `test_no_signature_match_yields_custom`, `test_generic_oidc_hint_with_custom_form_reports_custom`, `test_conflict_resolution_prefers_specificity`, `test_flow_detection_webauthn_otp_magic`, plus browser E2E `test_end_to_end_detector_on_fixture`.
+
+## ISS-013 — SecurityDetector (2026-08-23)
+### What was done
+- Header audit with parsing: HSTS (max-age/includeSubDomains/preload), CSP directive breakdown, XFO/COOP/CORP/COEP/Permissions-Policy/Referrer-Policy presence; missing-header inventory.
+- Cookie hygiene scoped to session-ish cookies (sess/login/auth/token/sid/jwt): missing Secure/HttpOnly/SameSite=None issues listed per cookie; non-session cookies ignored.
+- CSRF detection (hidden token names set, meta csrf-token), honeypot passthrough from static analyzer, MFA text heuristics, client-side password minLength extraction, autocomplete noted via form fields.
+- Single comprehensive `posture` finding whose `extra` maps 1:1 onto `security_findings` columns for ISS-015 persistence.
+### How to verify
+- `tests/test_detectors.py::test_security_*` (full headers + parsed values, missing headers + cookie issues, honeypot/MFA/policy).
+
+## ISS-014 — Captcha/WAF/Fingerprint detectors (2026-08-23)
+### What was done
+- **CaptchaDetector**: vendor+variant detection; visible-vs-invisible via rendered-widget DOM markers per family; score-vs-challenge classification (v3/enterprise → score_based_invisible); render-param disambiguation prevents v2 variants firing on `api.js?render=` pages; widget-rendered hits get a confidence bump.
+- **WAFDetector**: signature matching over headers/cookies/DOM/scripts/network; two-plus independent signals → full confidence, single signal → 15% haircut; challenge/403 interstitials with no vendor match emit `unknown_block` intelligence finding; `blocked_scan` state propagated in extras.
+- **FingerprintDetector**: vendor SDK signatures (FPJS Pro, FingerprintJS OSS, Castle, Sift, Seon, iovation, ThreatMetrix, Akamai sensor) + generic canvas/WebGL read detection from runtime hook counters (threshold ≥2 reads to avoid benign false positives).
+### How to verify
+- `tests/test_detectors.py::test_recaptcha_v3_score_invisible`, `test_turnstile_visible_vs_invisible`, `test_recaptcha_v2_checkbox_visible`, `test_waf_headers_cookies_and_interstitial`, `test_waf_unknown_block`, `test_fingerprinting_vendor_and_generic_reads`.
+
+## M1 verification summary (2026-08-23)
+- **46/46 tests pass** (config 5, round-trip 1, detector units 16, signature system 6, runner 3, browser integration 15) against a real Chromium + offline fixture site (20 fixture pages emulating providers, captchas, WAFs, honeypots, CSP, blocked challenges).
+- ruff + mypy clean across 29 source files.
+- Signatures synced to live Postgres: 46 auth / 9 antibot / 10 captcha / 9 fingerprinting.
+### Known gaps carried forward
+- Response bodies not captured (needed for deep_scan JS analysis).
+- Proxy pools are stubbed (per-context plumbing only) until ISS-022.
+- No Celery wiring yet — controller/context manager invoked directly from tests; orchestration lands in M3 (ISS-018).
+
+

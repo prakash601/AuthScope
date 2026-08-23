@@ -1,0 +1,71 @@
+# AuthScope — fingerprinting / device-intelligence signatures.
+- name: fingerprintjs_open_source
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.85
+  signals:
+    script_src: ["fingerprintjs", "@fingerprintjs/fingerprintjs"]
+    global_object: ["FingerprintJS"]
+
+- name: fpjs_pro_bot_detection
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.92
+  signals:
+    script_src: ["fpjscdn.net", "fpjs.io/v3"]
+    network: ["api.fpjs.io", "identity.fpjs.io"]
+
+- name: castle
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.9
+  signals:
+    script_src: ["castle.io/v2/mod.js", "castle.io/__c"]
+    network: ["api.castle.io"]
+
+- name: sift_science
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.88
+  signals:
+    script_src: ["cdn.sift.com/s.js", "siftscience"]
+    global_object: ["_sift"]
+
+- name: creepjs
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.8
+  signals:
+    script_src: ["creepjs"]
+
+- name: seon
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.84
+  signals:
+    script_src: ["seon.io/js/seon-full.js", "seon-sdk"]
+    global_object: ["Seon"]
+
+- name: iovation
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.84
+  signals:
+    script_src: ["iovation.com", "snare.io"]
+    global_object: ["IGLOO"]
+
+- name: threatmetrix_lexisnexis
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.84
+  signals:
+    script_src: ["online-metrix.net", "threatmetrix"]
+    dom: ["tmx_tags"]
+
+- name: akamai_sensor_telemetry
+  type: fingerprinting
+  category: fingerprinting
+  confidence: 0.8
+  signals:
+    script_src: ["go-mpulse.net/boomerang", "nccscdn.com"]
+    inline_js: ["AKSB", "bmak"]
