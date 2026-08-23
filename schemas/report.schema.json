@@ -1,0 +1,301 @@
+{
+  "$defs": {
+    "AntibotSection": {
+      "properties": {
+        "difficulty_score": {
+          "default": 0,
+          "title": "Difficulty Score",
+          "type": "integer"
+        },
+        "difficulty_reasoning": {
+          "default": "",
+          "title": "Difficulty Reasoning",
+          "type": "string"
+        },
+        "captcha": {
+          "$ref": "#/$defs/CaptchaSummary"
+        },
+        "waf_providers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Waf Providers",
+          "type": "array"
+        },
+        "fingerprinting_signals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fingerprinting Signals",
+          "type": "array"
+        },
+        "cookies_detected": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cookies Detected",
+          "type": "array"
+        },
+        "blocked_scan": {
+          "default": false,
+          "title": "Blocked Scan",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "title": "AntibotSection",
+      "type": "object"
+    },
+    "ArtifactsSection": {
+      "properties": {
+        "har_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Har Url"
+        },
+        "screenshot_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot Url"
+        },
+        "dom_snapshot_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dom Snapshot Url"
+        },
+        "trace_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Url"
+        }
+      },
+      "title": "ArtifactsSection",
+      "type": "object"
+    },
+    "AuthSection": {
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "confidence": {
+          "default": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "flows": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flows",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "other_providers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Other Providers",
+          "type": "array"
+        }
+      },
+      "title": "AuthSection",
+      "type": "object"
+    },
+    "CaptchaSummary": {
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "visible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visible"
+        },
+        "score_based": {
+          "default": false,
+          "title": "Score Based",
+          "type": "boolean"
+        }
+      },
+      "title": "CaptchaSummary",
+      "type": "object"
+    },
+    "SecuritySection": {
+      "properties": {
+        "risk_score": {
+          "default": 0,
+          "title": "Risk Score",
+          "type": "integer"
+        },
+        "has_csrf": {
+          "default": false,
+          "title": "Has Csrf",
+          "type": "boolean"
+        },
+        "has_hsts": {
+          "default": false,
+          "title": "Has Hsts",
+          "type": "boolean"
+        },
+        "has_csp": {
+          "default": false,
+          "title": "Has Csp",
+          "type": "boolean"
+        },
+        "cookie_flags": {
+          "additionalProperties": true,
+          "title": "Cookie Flags",
+          "type": "object"
+        },
+        "mfa_detected": {
+          "default": false,
+          "title": "Mfa Detected",
+          "type": "boolean"
+        },
+        "raw_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Raw Headers",
+          "type": "object"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        }
+      },
+      "title": "SecuritySection",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scan_id": {
+      "title": "Scan Id",
+      "type": "string"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    },
+    "status": {
+      "default": "completed",
+      "title": "Status",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "scoring_strategy": {
+      "default": "",
+      "title": "Scoring Strategy",
+      "type": "string"
+    },
+    "auth": {
+      "$ref": "#/$defs/AuthSection"
+    },
+    "security": {
+      "$ref": "#/$defs/SecuritySection"
+    },
+    "antibot": {
+      "$ref": "#/$defs/AntibotSection"
+    },
+    "artifacts": {
+      "$ref": "#/$defs/ArtifactsSection"
+    }
+  },
+  "required": [
+    "scan_id",
+    "url"
+  ],
+  "title": "AuthScope Scan Report",
+  "type": "object",
+  "$id": "https://authscope.dev/schemas/report.schema.json"
+}
