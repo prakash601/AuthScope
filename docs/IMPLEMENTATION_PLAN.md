@@ -12,7 +12,7 @@
 
 | Milestone | Scope | Issues | Status |
 |---|---|---|---|
-| **M0 — Foundation** | Repo scaffold, dev environment, database | ISS-001 – ISS-004 | ⬜ |
+| **M0 — Foundation** | Repo scaffold, dev environment, database | ISS-001 – ISS-004 | ✅ |
 | **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ⬜ |
 | **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ⬜ |
 | **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ⬜ |
@@ -25,74 +25,74 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 ## M0 — Foundation
 
 ### ISS-001 — Repository scaffold & toolchain
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Create the Python project skeleton matching the planned layout (`api/`, `engine/`, `pipeline/`, `workers/`, `signatures/`, `db/`, `tests/`), with dependency management, formatting, linting, and type checking configured so every later issue has a stable baseline.
 
 **Tasks:**
-- [ ] `pyproject.toml` (deps: fastapi, pydantic v2, uvicorn, celery, redis, playwright, sqlalchemy 2.0, alembic, httpx, structlog)
-- [ ] Dev deps: ruff (lint+format), mypy, pytest, pytest-asyncio
-- [ ] Directory skeleton with `__init__.py`
-- [ ] `.env.example`, `.gitignore`, Makefile (`make lint test run`)
-- [ ] Git init, first commit
+- [x] `pyproject.toml` (deps: fastapi, pydantic v2, uvicorn, celery, redis, playwright, sqlalchemy 2.0, alembic, httpx, structlog)
+- [x] Dev deps: ruff (lint+format), mypy, pytest, pytest-asyncio
+- [x] Directory skeleton with `__init__.py`
+- [x] `.env.example`, `.gitignore`, Makefile (`make lint test run`)
+- [x] Git init, first commit
 
 **Acceptance criteria:**
-- [ ] `make lint` and `make test` pass on a clean clone
-- [ ] `python -c "import api, engine, pipeline, workers"` succeeds
-- [ ] README "Getting Started" commands match actual setup
+- [x] `make lint` and `make test` pass on a clean clone
+- [x] `python -c "import api, engine, pipeline, workers"` succeeds
+- [x] README "Getting Started" commands match actual setup
 
 ---
 
 ### ISS-002 — Local dev environment (Docker Compose)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** One-command startup of all infrastructure services for local development.
 
 **Tasks:**
-- [ ] `docker-compose.yml`: postgres:15, redis:7, minio (S3-compatible), adminer/pgadmin optional
-- [ ] Health checks + startup ordering
-- [ ] Named volumes; MinIO bucket auto-created via init script
-- [ ] Env var wiring shared with app config
+- [x] `docker-compose.yml`: postgres:15, redis:7, minio (S3-compatible), adminer/pgadmin optional
+- [x] Health checks + startup ordering
+- [x] Named volumes; MinIO bucket auto-created via init script
+- [x] Env var wiring shared with app config
 
 **Acceptance criteria:**
-- [ ] `docker compose up -d` brings up all services healthy
-- [ ] Postgres reachable at `localhost:5432`, Redis at `6379`, MinIO at `9000`
-- [ ] Restarting compose retains data
+- [x] `docker compose up -d` brings up all services healthy
+- [x] Postgres reachable at `localhost:5432`, Redis at `6379`, MinIO at `9000`
+- [x] Restarting compose retains data
 
 ---
 
 ### ISS-003 — Configuration & settings module
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Single typed settings object (Pydantic `BaseSettings`) loaded from env/.env used by every component — no scattered `os.getenv`.
 
 **Tasks:**
-- [ ] `config.py` with grouped settings: Database, Redis, S3, Scan (timeouts, cache TTL), Auth, Proxy
-- [ ] Validation with clear error messages on missing required vars
-- [ ] Unit tests for defaults and failure cases
+- [x] `config.py` with grouped settings: Database, Redis, S3, Scan (timeouts, cache TTL), Auth, Proxy
+- [x] Validation with clear error messages on missing required vars
+- [x] Unit tests for defaults and failure cases
 
 **Acceptance criteria:**
-- [ ] `get_settings()` returns validated config from `.env`
-- [ ] Missing mandatory var raises actionable error naming the variable
-- [ ] Test coverage ≥ 90% for this module
+- [x] `get_settings()` returns validated config from `.env`
+- [x] Missing mandatory var raises actionable error naming the variable
+- [x] Test coverage ≥ 90% for this module
 
 ---
 
 ### ISS-004 — Database schema & migrations
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Implement the full PostgreSQL schema (scans, auth_findings, security_findings, antibot_findings, artifacts, signatures, users, api_keys, webhooks, feedback) with Alembic migrations and SQLAlchemy async models.
 
 **Tasks:**
-- [ ] SQLAlchemy 2.0 async models mirroring the schema in README §Database Schema
-- [ ] Alembic initial migration
-- [ ] Indexes: `scans(normalized_url, created_at)`, `scans(status)`, findings by scan_id
-- [ ] Seed script for dev API key
+- [x] SQLAlchemy 2.0 async models mirroring the schema in README §Database Schema
+- [x] Alembic initial migration
+- [x] Indexes: `scans(normalized_url, created_at)`, `scans(status)`, findings by scan_id
+- [x] Seed script for dev API key
 
 **Acceptance criteria:**
-- [ ] `alembic upgrade head` creates all tables on empty DB
-- [ ] `alembic downgrade base` cleanly reverses
-- [ ] Model round-trip test (insert scan + all findings, read back intact incl. JSONB/arrays)
+- [x] `alembic upgrade head` creates all tables on empty DB
+- [x] `alembic downgrade base` cleanly reverses
+- [x] Model round-trip test (insert scan + all findings, read back intact incl. JSONB/arrays)
 
 ---
 
