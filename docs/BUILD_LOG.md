@@ -302,6 +302,73 @@
 - Proxy pool is env-config stub; residential providers (BrightData etc.) plug into `ProxyManager` later.
 - Webhook DLQ has no re-drive UI/API yet (entries are inspectable in Redis).
 
+## ISS-024 — Historical diff endpoint (2026-08-23)
+### What was done
+- `pipeline/diff.py`: comparable `Snapshot` projection + `compute_diff()` producing typed changes (changed / added / removed / score_delta with delta values) across auth provider, flows, captcha type+visibility, WAF providers, fingerprinting, security flags (HSTS/CSP/CSRF/MFA), and both scores.
+- `GET /v1/scans/{id}/diff?days=N`: finds the most recent prior completed/waf_blocked scan of the same normalized URL + owner inside the window (uses the `(normalized_url, created_at)` index from M0), builds snapshots from DB rows, returns the diff. No-prior case returns an explanatory note; ownership enforced.
+### How to verify
+- `pytest tests/test_diff.py` — captcha vendor change detected with before/after values; identical consecutive scans → empty diff; WAF add + score deltas correct; 120-scan history performance test (<5s generous bound, ~ms actual); fresh-URL note path.
+
+## ISS-025 — Feedback loop (2026-08-23)
+### What was done
+- `POST /v1/scans/{scan_id}/feedback` — validates finding_kind/verdict against whitelists (422 on violation), scan ownership (404), persists to the feedback table.
+- Alembic migration adding the `signature_feedback_stats` SQL view: confirmed/false_positive counts and fp_rate per signature.
+- `GET /v1/feedback/stats` exposes the view for signature-tuning workflows.
+### How to verify
+- `pytest tests/test_feedback.py` — submit/persist, invalid verdict & kind rejected, unknown scan 404, stats view aggregates exact counts/rate.
+
+## ISS-026 — Observability (2026-08-23)
+### What was done
+- `telemetry.py`: Prometheus collectors (HTTP requests/latency by route, scan duration + totals by status, per-detector duration, live browser contexts gauge, queue depth gauge, webhook DLQ counter) in a dedicated registry.
+- `/metrics` endpoint updates queue depth from Redis then serves Prometheus text format.
+- OTel tracing via the API-only default (no-op) with `setup_tracing()` configuring an OTLP exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; worker wraps each scan in a `worker.run_scan` span.
+- `deploy/grafana/dashboard.json` — 9 panels (completion rate, scans/min by status, contexts gauge, scan/HTTP/detector p95s, error rate, DLQ, queue depth). `deploy/prometheus/alerts.yml` — failure spike, backlog, waf_blocked spike, latency alerts with page/warn severities.
+### Design decisions / deviations
+- Multi-process metric aggregation caveat documented: each worker process exposes its own counters; production should scrape workers via pod annotations or a push gateway (runbook note).
+### How to verify
+- `pytest tests/test_observability.py` — /metrics format + series presence, dashboard panel/metric coverage, alert rule validity, in-process OTel span export proving scan+detector spans, no-op without env var.
+
+## ISS-027 — Test suite completion & fixture zoo (2026-08-23)
+### What was done
+- Fixture zoo meta-tests: ≥15 pages enforced, explicit coverage matrix asserting every major detection class has fixture representation (auth0, turnstile/recaptcha/hcaptcha/arkose, datadome/akamai/PX/kasada, fpjs/castle, honeypot, CSRF, webauthn, magic link, OTP, SAML, PII).
+- Coverage gates wired into pyproject (`[tool.coverage]` fail_under=70) and `make coverage`.
+- GitHub Actions workflow `.github/workflows/ci.yml`: Postgres/Redis/MinIO services, bucket bootstrap, ruff, mypy, migrations, pytest with `--cov-fail-under=70` + trace artifact upload.
+### Measured coverage (local run)
+- **Overall: 90%** (2183 stmts / 210 missed) — engine core mostly 90–100% (controller 85%, context manager 88%), pipeline 95–100%, api 81–100%, workers 85–100%. Exceeds the ≥80% engine / ≥70% overall targets.
+### How to verify
+- `pytest tests/test_fixture_zoo.py`; `make coverage`.
+
+## ISS-028 — Dashboard MVP (2026-08-23)
+### What was done
+- Static SPA under `dashboard/` served at `/dashboard` (StaticFiles, html=True): API-key entry (localStorage), scan submission with polling until completion (auto-opens report), scan list with filters + auto-refresh, full report view (difficulty/risk scores, auth/security/antibot sections, reasoning, screenshot thumbnail + HAR/DOM evidence links, raw JSON), diff view rendering ISS-024 changes as a table. Detection-only disclaimer shown in the nav.
+### Limitations & known gaps
+- Plain fetch+DOM (no framework/build step) — intentionally minimal MVP.
+- CORS not needed (same origin); multi-user features (login, teams) deferred.
+### How to verify
+- `pytest tests/test_dashboard_and_policy.py::test_dashboard_assets_served`; manual: open http://localhost:8000/dashboard/, paste dev key, run a scan.
+
+## ISS-029 — Production readiness pass (2026-08-23)
+### What was done
+- **Containers**: `Dockerfile.api` (python slim, uvicorn CMD) and `Dockerfile.worker` (Playwright base image with Chromium, non-default concurrency=2).
+- **Kubernetes** (`deploy/k8s/`): api Deployment+Service with health probes and Prometheus scrape annotations; worker Deployment + memory HPA (70%, min3/max20 per the ~150MB/context budget); migrations Job; secrets/config template (secrets clearly marked replace-me — provisioned via secret manager).
+- **Robots.txt policy flag**: `SCAN_RESPECT_ROBOTS_TXT` (default off); controller checks robots.txt before navigation when enabled and short-circuits with `blocked_reason="robots_disallowed"`.
+- **Disclaimer**: constant surfaced in every report response (`disclaimer`) and the dashboard nav.
+- **Load test harness** `scripts/loadtest.py` (concurrency-limited, latency percentiles, optional result polling) plus a live validation run:
+  - Real Celery worker (concurrency=4) + uvicorn API + Chromium against the fixture site: **24/24 scans completed end-to-end, 0 errors, wall 49s (~0.5 scans/s sustained), p50 16.0s / p95 17.4s per scan lifecycle.**
+- **Runbook** `docs/RUNBOOK.md`: deploy steps, waf_blocked/failure/backlog/latency triage, retention cleanup, signature update flow, compliance flags.
+### Deviations & limitations
+- The plan's "50 concurrent scans" soak assumes the staging browser pool (multiple worker pods + residential proxies); validated here at 24 concurrent-submission scale on a single machine with a real broker/worker/browser pool. The harness scales up unchanged.
+- Robots.txt check fetches robots.txt out-of-band (urllib) rather than through the proxy path.
+- Grafana/Prometheus containers not added to compose (dashboards/rules ready to import into existing stacks).
+### How to verify
+- `pytest tests/test_dashboard_and_policy.py` (assets, disclaimer, robots flag paths); `scripts/loadtest.py --help`; inspect `deploy/` manifests; `docs/RUNBOOK.md`.
+
+## M4 verification summary (2026-08-23)
+- **130/130 tests pass**, ruff + mypy clean across 49 source files, **overall coverage 90%**.
+- Live load validation through real Celery + Chromium completed with zero errors.
+- All milestones (M0–M4) complete: detection engine, API platform, scoring, diffing, feedback loop, observability, dashboard, and deployment packaging.
+
+
 
 
 

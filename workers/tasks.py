@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
+from telemetry import (
+    DETECTOR_DURATION,
+    SCAN_DURATION,
+    SCANS_TOTAL,
+)
 from workers.celery_app import celery_app
 from workers.proxy import ProxyManager, load_proxy_manager
 
@@ -36,11 +42,25 @@ def run_scan(self, scan_id: str) -> str:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(_run_scan(scan_id))
+        return _execute(scan_id)
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, _run_scan(scan_id)).result()
+        return pool.submit(_execute, scan_id).result()
+
+
+def _execute(scan_id: str) -> str:
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("authscope.worker")
+    started = time.monotonic()
+    with tracer.start_as_current_span("worker.run_scan") as span:
+        span.set_attribute("authscope.scan_id", scan_id)
+        status = asyncio.run(_run_scan(scan_id))
+        span.set_attribute("authscope.status", status)
+    SCAN_DURATION.labels(status=status).observe(time.monotonic() - started)
+    SCANS_TOTAL.labels(status=status).inc()
+    return status
 
 
 async def _run_scan(scan_id: str) -> str:
@@ -172,17 +192,19 @@ async def _finalize(
     cache = await load_fresh_cache(session_factory)
     signatures = all_signatures(cache)
 
-    outcomes = await run_detectors(
-        [
-            AuthProviderDetector(signatures),
-            SecurityDetector(),
-            CaptchaDetector(signatures),
-            WAFDetector(signatures),
-            FingerprintDetector(signatures),
-        ],
-        artifact,
-    )
+    detectors = [
+        AuthProviderDetector(signatures),
+        SecurityDetector(),
+        CaptchaDetector(signatures),
+        WAFDetector(signatures),
+        FingerprintDetector(signatures),
+    ]
+    outcomes = await run_detectors(detectors, artifact)
     findings = [f for outcome in outcomes for f in outcome.findings]
+    for outcome in outcomes:
+        DETECTOR_DURATION.labels(detector=outcome.detector).observe(
+            outcome.duration_ms / 1000
+        )
 
     report, _scores = aggregate(
         scan_id,

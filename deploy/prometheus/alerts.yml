@@ -1,0 +1,39 @@
+# AuthScope Prometheus alert rules
+groups:
+  - name: authscope-scan-health
+    rules:
+      - alert: AuthScopeScanFailureSpike
+        expr: |
+          sum(rate(authscope_scans_total{status="failed"}[10m]))
+            / clamp_min(sum(rate(authscope_scans_total[10m])), 0.001) > 0.2
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "AuthScope scan failure rate above 20%"
+          description: "Worker crashes or systemic engine errors — check worker logs and OOM kills."
+
+      - alert: AuthScopeQueueBacklog
+        expr: authscope_queue_depth{queue="celery"} > 200
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Celery queue backlog > 200"
+          description: "Workers cannot keep up with scan submissions; scale workers."
+
+      - alert: AuthScopeWafBlockedSpike
+        expr: |
+          sum(rate(authscope_scans_total{status="waf_blocked"}[15m]))
+            / clamp_min(sum(rate(authscope_scans_total[15m])), 0.001) > 0.3
+        for: 20m
+        labels: { severity: warn }
+        annotations:
+          summary: ">30% of scans ending waf_blocked"
+          description: "Proxy pool may be burned out or a target hardened; rotate proxies."
+
+      - alert: AuthScopeHighScanLatency
+        expr: histogram_quantile(0.95, sum(rate(authscope_scan_duration_seconds_bucket[10m])) by (le)) > 60
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "p95 scan duration above 60s"
+          description: "Browser farm saturation or slow targets; check context count and CPU."

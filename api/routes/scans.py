@@ -20,6 +20,7 @@ from api.schemas import (
 )
 from api.urls import UrlRejectedError, safe_target_url
 from db.models import AntibotFinding, Artifacts, AuthFinding, Scan, SecurityFinding
+from pipeline.diff import compute_diff
 
 router = APIRouter(prefix="/v1/scans", tags=["scans"])
 
@@ -192,10 +193,13 @@ async def build_report_response(session_factory, scan: Scan, settings) -> dict:
     def presign(uri: str | None) -> str | None:
         return presign_url(uri) if uri else None
 
+    from pipeline.aggregator import DETECTION_ONLY_DISCLAIMER
+
     report = {
         "scan_id": str(scan.id),
         "url": scan.url,
         "status": scan.status,
+        "disclaimer": DETECTION_ONLY_DISCLAIMER,
         "created_at": scan.created_at.isoformat() if scan.created_at else None,
         "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
         "auth": {
@@ -234,6 +238,137 @@ async def build_report_response(session_factory, scan: Scan, settings) -> dict:
         },
     }
     return report
+
+
+@router.get("/{scan_id}/diff")
+async def get_scan_diff(
+    scan_id: str,
+    request: Request,
+    days: int = 30,
+    auth: AuthContext = Depends(require_api_key),
+):
+    """What changed vs the most recent prior scan of the same URL within `days`."""
+    session_factory = request.app.state.session_factory
+    try:
+        sid = uuid.UUID(scan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={
+            "code": "not_found", "message": "scan not found"}) from exc
+
+    async with session_factory() as session:
+        scan = (
+            await session.execute(
+                sa.select(Scan).where(Scan.id == sid,
+                                      Scan.user_id == uuid.UUID(auth.user_id))
+            )
+        ).scalar_one_or_none()
+        if scan is None:
+            raise HTTPException(status_code=404, detail={
+                "code": "not_found", "message": "scan not found"})
+
+        prev = await _previous_snapshot(session, scan, days)
+        if prev is None:
+            return {"scan_id": scan_id, "days": days, "changes": [],
+                    "note": "no prior scan in window"}
+        prev_snapshot = prev
+
+    current = await build_snapshot(session_factory, scan)
+    changes = compute_diff(current, prev_snapshot)
+    out = changes.as_dict()
+    out["days"] = days
+    return JSONResponse(content=out)
+
+
+async def _previous_snapshot(session, scan: Scan, days: int):
+    """Most recent comparable scan of the same normalized URL inside the window."""
+    import datetime as dt
+
+    from pipeline.diff import Snapshot
+
+    cutoff = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
+    row = (
+        await session.execute(
+            sa.select(Scan, AuthFinding, SecurityFinding, AntibotFinding)
+            .outerjoin(AuthFinding, AuthFinding.scan_id == Scan.id)
+            .outerjoin(SecurityFinding, SecurityFinding.scan_id == Scan.id)
+            .outerjoin(AntibotFinding, AntibotFinding.scan_id == Scan.id)
+            .where(
+                Scan.normalized_url == scan.normalized_url,
+                Scan.user_id == scan.user_id,
+                Scan.status.in_(("completed", "waf_blocked")),
+                Scan.created_at < scan.created_at,
+                Scan.created_at >= cutoff,
+            )
+            .order_by(Scan.created_at.desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    s, af, sf, ab = row
+    return Snapshot(
+        scan_id=str(s.id),
+        created_at=s.created_at.isoformat() if s.created_at else "",
+        provider=af.provider if af else None,
+        flows=list(af.flow or []) if af else [],
+        captcha_type=ab.captcha_type if ab else None,
+        captcha_visible=ab.captcha_visible if ab else None,
+        waf_providers=list(ab.waf_providers or []) if ab else [],
+        fingerprinting=list(ab.fingerprinting_signals or []) if ab else [],
+        has_hsts=bool(sf.has_hsts) if sf else False,
+        has_csp=bool(sf.has_csp) if sf else False,
+        has_csrf=bool(sf.has_csrf) if sf else False,
+        mfa_detected=bool(sf.mfa_detected) if sf else False,
+        difficulty_score=s.difficulty_score,
+        security_score=s.security_score,
+    )
+
+
+async def build_snapshot(session_factory, scan: Scan):
+    """Snapshot for the given scan row (fresh session lookups)."""
+
+    from pipeline.diff import Snapshot
+
+    async with session_factory() as session:
+        row = (
+            await session.execute(
+                sa.select(AuthFinding, SecurityFinding, AntibotFinding)
+                .outerjoin(SecurityFinding, SecurityFinding.scan_id == AuthFinding.scan_id)
+                .outerjoin(AntibotFinding, AntibotFinding.scan_id == AuthFinding.scan_id)
+                .where(AuthFinding.scan_id == scan.id)
+            )
+        ).first()
+        if row is not None:
+            af, sf, ab = row
+        else:
+            af = None
+            sf = (
+                await session.execute(
+                    sa.select(SecurityFinding).where(SecurityFinding.scan_id == scan.id)
+                )
+            ).scalar_one_or_none()
+            ab = (
+                await session.execute(
+                    sa.select(AntibotFinding).where(AntibotFinding.scan_id == scan.id)
+                )
+            ).scalar_one_or_none()
+
+    return Snapshot(
+        scan_id=str(scan.id),
+        created_at=scan.created_at.isoformat() if scan.created_at else "",
+        provider=af.provider if af else None,
+        flows=list(af.flow or []) if af else [],
+        captcha_type=ab.captcha_type if ab else None,
+        captcha_visible=ab.captcha_visible if ab else None,
+        waf_providers=list(ab.waf_providers or []) if ab else [],
+        fingerprinting=list(ab.fingerprinting_signals or []) if ab else [],
+        has_hsts=bool(sf.has_hsts) if sf else False,
+        has_csp=bool(sf.has_csp) if sf else False,
+        has_csrf=bool(sf.has_csrf) if sf else False,
+        mfa_detected=bool(sf.mfa_detected) if sf else False,
+        difficulty_score=scan.difficulty_score,
+        security_score=scan.security_score,
+    )
 
 
 async def _get_scan_for_user(session_factory, scan_id: str, user_id: str) -> Scan | None:

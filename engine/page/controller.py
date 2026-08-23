@@ -113,6 +113,32 @@ class PageController:
             else (settings_lazy or 0)
         )
 
+    async def _robots_disallows(self, url: str) -> bool:
+        """Check robots.txt when the org-policy flag is enabled."""
+        from config import get_settings
+
+        try:
+            settings = get_settings()
+        except Exception:  # noqa: BLE001 — direct construction in unit tests
+            return False
+        if not settings.scan.respect_robots_txt:
+            return False
+        import urllib.request
+        from urllib.parse import urlsplit
+        from urllib.robotparser import RobotFileParser
+
+        parts = urlsplit(url)
+        robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
+        try:
+            with urllib.request.urlopen(robots_url, timeout=5) as resp:
+                body = resp.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 — no/unreadable robots.txt = allowed
+            return False
+        parser = RobotFileParser()
+        parser.parse(body.splitlines())
+        ua = "*"
+        return not parser.can_fetch(ua, url)
+
     async def run(
         self,
         managed: ManagedContext,
@@ -172,6 +198,19 @@ class PageController:
         blocked = False
         blocked_reason: str | None = None
         goto_error: str | None = None
+
+        # Optional robots.txt compliance (org policy flag, off by default).
+        if await self._robots_disallows(url):
+            logger.info("robots.txt disallows %s — skipping navigation", url)
+            artifact = PageArtifact(
+                url=url,
+                final_url=url,
+                http_status=None,
+                blocked=True,
+                blocked_reason="robots_disallowed",
+            )
+            return CaptureResult(artifact=artifact)
+
         try:
             await page.goto(url, wait_until="networkidle", timeout=45_000)
         except Exception as exc:  # noqa: BLE001 — timeouts/DNS/neterrors still yield partial evidence

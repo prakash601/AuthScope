@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authscope-worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: authscope, tier: worker }
+  template:
+    metadata:
+      labels: { app: authscope, tier: worker }
+    spec:
+      containers:
+        - name: worker
+          image: registry.example.com/authscope/worker:latest
+          envFrom:
+            - configMapRef: { name: authscope-config }
+            - secretRef: { name: authscope-secrets }
+          # One pod ≈ concurrency × ~150MB browser contexts + overhead.
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits: { memory: "1536Mi" }
+---
+# HPA on memory per README §Production Considerations (context budget ~150MB).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: authscope-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: authscope-worker
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target: { type: Utilization, averageUtilization: 70 }

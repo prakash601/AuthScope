@@ -623,26 +623,43 @@ authscope/
 
 ---
 
-## Getting Started (planned)
+## Getting Started
 
 ```bash
 git clone https://github.com/your-org/authscope.git
 cd authscope
-docker compose up -d          # postgres, redis, minio, grafana stack
-uv sync                        # or pip install -r requirements.txt
-playwright install chromium
-uvicorn api.main:app --reload
-celery -A workers.celery_app worker --loglevel=info
+make install            # venv, deps, chromium
+make compose-up         # postgres + redis + minio
+make db-upgrade         # schema migrations
+python -m db.seed       # dev API key ("dev-key")
+python -m db.load_signatures   # load 74 detection signatures
+
+# terminal 1
+make run-api            # http://localhost:8000 (docs at /docs)
+# terminal 2
+make run-worker
+
+# dashboard at http://localhost:8000/dashboard/
 ```
 
-Then:
+Scan something:
 
 ```bash
 curl -X POST http://localhost:8000/v1/scans \
   -H "X-API-Key: dev-key" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/login"}'
+# → 202 {"scan_id": "...", "status": "queued"}
+
+curl http://localhost:8000/v1/scans/<scan_id> -H "X-API-Key: dev-key"
 ```
+
+Other useful commands: `make test` (130 tests), `make coverage` (90% overall), `make lint`.
+
+**Production:** see `Dockerfile.api` / `Dockerfile.worker`, Kubernetes manifests in
+`deploy/k8s/`, Grafana dashboard in `deploy/grafana/`, alert rules in
+`deploy/prometheus/alerts.yml`, and `docs/RUNBOOK.md`. Load-test with
+`scripts/loadtest.py`.
 
 ---
 

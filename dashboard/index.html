@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AuthScope Dashboard</title>
+<link rel="stylesheet" href="/dashboard/style.css">
+</head>
+<body>
+<header>
+  <h1>AuthScope</h1>
+  <span class="tagline">Login Intelligence &amp; Anti-Bot Detection</span>
+</header>
+
+<section id="key-panel" class="card">
+  <label>API Key <input type="password" id="api-key" placeholder="X-API-Key"></label>
+  <button id="save-key">Save key</button>
+  <span id="key-status"></span>
+</section>
+
+<main id="app" class="hidden">
+  <nav>
+    <button data-view="submit" class="active">New scan</button>
+    <button data-view="list">Scans</button>
+    <button data-view="report">Report</button>
+    <button data-view="diff">Diff</button>
+    <span id="disclaimer">Detection &amp; reporting only — AuthScope never bypasses protections.</span>
+  </nav>
+
+  <!-- Submit -->
+  <section id="view-submit" class="view">
+    <div class="card">
+      <h2>New scan</h2>
+      <label>Target login URL
+        <input type="url" id="scan-url" placeholder="https://example.com/login">
+      </label>
+      <label class="inline"><input type="checkbox" id="opt-deep"> Deep scan</label>
+      <label class="inline"><input type="checkbox" id="opt-force"> Force (bypass cache)</label>
+      <button id="btn-scan">Start scan</button>
+      <pre id="scan-status"></pre>
+    </div>
+  </section>
+
+  <!-- List -->
+  <section id="view-list" class="view hidden">
+    <div class="card">
+      <h2>Scans</h2>
+      <div class="filters">
+        <input id="f-provider" placeholder="provider (e.g. auth0)">
+        <input id="f-captcha" placeholder="captcha type">
+        <input id="f-min-diff" placeholder="min difficulty" type="number">
+        <select id="f-status">
+          <option value="">any status</option>
+          <option>queued</option><option>running</option>
+          <option>completed</option><option>waf_blocked</option><option>failed</option>
+        </select>
+        <button id="btn-filter">Filter</button>
+        <button id="btn-refresh">Refresh</button>
+        <label class="inline"><input type="checkbox" id="auto-refresh"> auto</label>
+      </div>
+      <table id="scans-table">
+        <thead><tr><th>ID</th><th>URL</th><th>Status</th><th>Difficulty</th>
+          <th>Risk</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Report -->
+  <section id="view-report" class="view hidden">
+    <div class="card">
+      <h2>Report <span id="report-id" class="mono"></span></h2>
+      <div id="report-summary" class="scores"></div>
+      <div id="report-auth"></div>
+      <div id="report-security"></div>
+      <div id="report-antibot"></div>
+      <h3>Evidence</h3>
+      <div id="report-artifacts"></div>
+      <pre id="report-raw" class="mono"></pre>
+    </div>
+  </section>
+
+  <!-- Diff -->
+  <section id="view-diff" class="view hidden">
+    <div class="card">
+      <h2>Historical diff</h2>
+      <label>Scan ID <input id="diff-scan-id" class="mono"></label>
+      <label>Window (days) <input id="diff-days" type="number" value="30" class="mono"></label>
+      <button id="btn-diff">Compute diff</button>
+      <table id="diff-table">
+        <thead><tr><th>Kind</th><th>Field</th><th>Before</th><th>After</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script src="/dashboard/app.js"></script>
+</body>
+</html>

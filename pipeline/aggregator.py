@@ -78,6 +78,12 @@ class ScanReport(BaseModel):
     artifacts: ArtifactsSection = Field(default_factory=ArtifactsSection)
 
 
+DETECTION_ONLY_DISCLAIMER = (
+    "AuthScope performs passive detection and reporting only. It does not "
+    "solve captchas, bypass bot protection, or automate logins."
+)
+
+
 def _auth_priority(f: Finding) -> tuple:
     specificity = 0 if f.name in GENERIC_AUTH_NAMES else 1
     return (-specificity, -len(f.matched_signals), -f.confidence, f.name)

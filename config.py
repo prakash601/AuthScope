@@ -58,6 +58,8 @@ class ScanSettings(BaseSettings):
     result_cache_ttl_hours: int = Field(default=6, ge=1, le=168)
     context_max_ram_mb: int = 150
     retry_blocked_once: bool = True
+    respect_robots_txt: bool = False
+    user_agent_token: str = "AuthScopeScanner"
 
 
 class ApiSettings(BaseSettings):

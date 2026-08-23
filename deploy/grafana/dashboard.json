@@ -1,0 +1,72 @@
+{
+  "title": "AuthScope",
+  "uid": "authscope-overview",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Scan completion rate (5m)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 6 },
+      "targets": [{ "expr": "sum(rate(authscope_scans_total{status=\"completed\"}[5m])) / clamp_min(sum(rate(authscope_scans_total[5m])), 0.001)" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Scans per minute by status",
+      "gridPos": { "x": 6, "y": 0, "w": 12, "h": 6 },
+      "targets": [{ "expr": "sum(rate(authscope_scans_total[1m])) by (status)" }]
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Live browser contexts",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 6 },
+      "targets": [{ "expr": "authscope_browser_contexts_live" }]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Scan duration p95",
+      "gridPos": { "x": 0, "y": 6, "w": 8, "h": 6 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(authscope_scan_duration_seconds_bucket[5m])) by (le))" }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP API latency p95 by route",
+      "gridPos": { "x": 8, "y": 6, "w": 8, "h": 6 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(authscope_http_request_seconds_bucket[5m])) by (le, route))" }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Detector duration p95",
+      "gridPos": { "x": 16, "y": 6, "w": 8, "h": 6 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(authscope_detector_duration_seconds_bucket[5m])) by (le, detector))" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "API error rate (5xx)",
+      "gridPos": { "x": 0, "y": 12, "w": 8, "h": 6 },
+      "targets": [{ "expr": "sum(rate(authscope_http_requests_total{status=~\"5..\"}[5m]))" }]
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Webhooks dead-lettered (total)",
+      "gridPos": { "x": 8, "y": 12, "w": 8, "h": 6 },
+      "targets": [{ "expr": "authscope_webhooks_deadlettered_total" }]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Queue depth",
+      "gridPos": { "x": 16, "y": 12, "w": 8, "h": 6 },
+      "targets": [{ "expr": "authscope_queue_depth{queue=\"celery\"}" }]
+    }
+  ]
+}

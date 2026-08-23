@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from api.deps import build_engine
+from api.routes.feedback import router as feedback_router
 from api.routes.scans import router as scans_router
 from api.routes.webhooks import router as webhooks_router
 
@@ -19,6 +21,9 @@ logger = logging.getLogger("authscope.api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from telemetry import setup_tracing
+
+    setup_tracing()
     settings = app.state.settings
     engine, session_factory = build_engine(settings)
     app.state.engine = engine
@@ -47,14 +52,43 @@ def create_app(settings=None) -> FastAPI:
     app.state.settings = settings
     app.include_router(scans_router)
     app.include_router(webhooks_router)
+    app.include_router(feedback_router)
+
+    from pathlib import Path as _Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    dashboard_dir = _Path(__file__).parent.parent / "dashboard"
+    if dashboard_dir.exists():
+        app.mount("/dashboard", StaticFiles(directory=dashboard_dir, html=True),
+                  name="dashboard")
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
+        from telemetry import observe_http
+
         request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
         request.state.request_id = request_id
+        start = time.time()
         response = await call_next(request)
+        route = getattr(request.scope.get("route"), "path", request.url.path)
+        observe_http(start, request.method, route, response.status_code)
         response.headers["X-Request-ID"] = request_id
         return response
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        from fastapi.responses import Response
+
+        from telemetry import QUEUE_DEPTH, metrics_response
+
+        try:
+            depth = await app.state.redis.llen("celery")
+            QUEUE_DEPTH.labels(queue="celery").set(depth or 0)
+        except Exception:  # noqa: BLE001 — metrics must not fail
+            pass
+        body, content_type = metrics_response()
+        return Response(content=body, media_type=content_type)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:

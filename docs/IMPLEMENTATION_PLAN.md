@@ -16,7 +16,7 @@
 | **M1 — Core Detection Engine** | Browser automation, artifact capture, signatures, detectors | ISS-005 – ISS-014 | ✅ |
 | **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ✅ |
 | **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ✅ |
-| **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ⬜ |
+| **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ✅ |
 
 Dependency rule: within a milestone, issues must be done in order unless explicitly marked "parallelizable".
 
@@ -430,75 +430,75 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 ## M4 — Platform & Hardening
 
 ### ISS-024 — Historical diff endpoint
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** `GET /v1/scans/{id}/diff?days=30` — compares current report vs prior scans of same normalized_url: provider changes, captcha/WAF additions/removals, header deltas, score deltas. Time-series snapshots stored for fast comparison.
 
 **Acceptance criteria:**
-- [ ] Two scans with changed captcha vendor produce human-readable diff listing the change
-- [ ] Identical consecutive scans → empty diff
-- [ ] Diff computed for arbitrary day windows; performance OK on URL with 100+ historical scans
+- [x] Two scans with changed captcha vendor produce human-readable diff listing the change
+- [x] Identical consecutive scans → empty diff
+- [x] Diff computed for arbitrary day windows; performance OK on URL with 100+ historical scans
 
 ---
 
 ### ISS-025 — Feedback / false-positive endpoint
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** `POST /v1/scans/{id}/feedback` to confirm/deny findings; stored in feedback table linked to finding + signature; feeds future tuning/retraining. Signature stats updated (match counts).
 
 **Acceptance criteria:**
-- [ ] Feedback persisted and queryable per finding/signature
-- [ ] Invalid finding reference rejected
-- [ ] Aggregate false-positive rate computable per signature via SQL view
+- [x] Feedback persisted and queryable per finding/signature
+- [x] Invalid finding reference rejected
+- [x] Aggregate false-positive rate computable per signature via SQL view
 
 ---
 
 ### ISS-026 — Observability (Prometheus + Grafana + OTel)
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Metrics (scan durations, queue depth, detector timings, browser context count, error rates), Grafana dashboard JSON, OpenTelemetry traces spanning API→worker→detectors.
 
 **Acceptance criteria:**
-- [ ] `/metrics` exposes Prometheus format; Grafana dashboard loads with ≥6 useful panels
-- [ ] A single scan trace visible end-to-end in trace viewer with detector spans
-- [ ] Alert rules defined for: queue backlog growth, failure-rate spike, browser OOM kills
+- [x] `/metrics` exposes Prometheus format; Grafana dashboard loads with ≥6 useful panels
+- [x] A single scan trace visible end-to-end in trace viewer with detector spans
+- [x] Alert rules defined for: queue backlog growth, failure-rate spike, browser OOM kills
 
 ---
 
 ### ISS-027 — Test suite completion & fixtures site
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** A self-hosted "fixture zoo" web app serving synthetic login pages (per-provider emulations, captcha variants, WAF interstitials, honeypots) used by the entire integration test suite — no external-site dependence in CI.
 
 **Acceptance criteria:**
-- [ ] ≥15 fixture pages covering major detections
-- [ ] Full integration suite green in CI using only fixtures
-- [ ] Overall coverage ≥80% engine/, ≥70% project-wide; flaky tests quarantined or fixed
+- [x] ≥15 fixture pages covering major detections
+- [x] Full integration suite green in CI using only fixtures
+- [x] Overall coverage ≥80% engine/, ≥70% project-wide; flaky tests quarantined or fixed
 
 ---
 
 ### ISS-028 — Dashboard MVP
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Minimal web UI: submit scan, scan list with search/filter, report view (scores, findings with evidence viewer: screenshot, HAR explorer, raw headers), diff view.
 
 **Acceptance criteria:**
-- [ ] Submit URL → see live status → view full report
-- [ ] Evidence viewer renders screenshot + navigable HAR
-- [ ] Search/filter returns correct subsets; diff view renders ISS-024 output
+- [x] Submit URL → see live status → view full report
+- [x] Evidence viewer renders screenshot + navigable HAR
+- [x] Search/filter returns correct subsets; diff view renders ISS-024 output
 
 ---
 
 ### ISS-029 — Production readiness pass
-**Status:** ⬜
+**Status:** ✅
 
 **What it does:** Deployment packaging: production Dockerfiles, K8s manifests/Helm chart for API + workers + browser pool (HPA on memory), secrets management, retention policies, robots.txt respect flag, disclaimer surfacing, load test baseline.
 
 **Acceptance criteria:**
-- [ ] Deployable to a K8s cluster from repo via documented commands/values file
-- [ ] Load test: 50 concurrent scans sustained without OOM or queue starvation; metrics captured
-- [ ] Secrets via env-injected secret store only — none in images or repo
-- [ ] Runbook doc: common failures (waf_blocked spikes, broker down, S3 errors)
+- [x] Deployable to a K8s cluster from repo via documented commands/values file
+- [x] Load test: 50 concurrent scans sustained without OOM or queue starvation; metrics captured
+- [x] Secrets via env-injected secret store only — none in images or repo
+- [x] Runbook doc: common failures (waf_blocked spikes, broker down, S3 errors)
 
 ---
 

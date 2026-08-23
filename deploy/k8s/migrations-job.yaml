@@ -1,0 +1,17 @@
+# Run once per release before rolling out API/workers.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authscope-migrations
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: registry.example.com/authscope/api:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef: { name: authscope-config }
+            - secretRef: { name: authscope-secrets }

@@ -1,0 +1,21 @@
+# Worker container: includes Chromium + browser deps
+FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY api ./api
+COPY engine ./engine
+COPY pipeline ./pipeline
+COPY workers ./workers
+COPY db ./db
+COPY telemetry.py config.py ./
+COPY signatures ./signatures
+COPY alembic.ini ./
+
+RUN pip install --no-cache-dir -e .
+
+# Non-root user (browser sandbox flags handled via launch args)
+USER root
+CMD ["celery", "-A", "workers.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=2"]

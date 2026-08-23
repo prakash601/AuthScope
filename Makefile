@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test db-upgrade db-downgrade run-api run-worker compose-up compose-down signatures-load
+.PHONY: install lint format typecheck test coverage db-upgrade db-downgrade run-api run-worker compose-up compose-down signatures-load
 
 install:
 	python3 -m venv .venv && .venv/bin/pip install -U pip
@@ -18,6 +18,9 @@ typecheck:
 
 test:
 	.venv/bin/pytest -q
+
+coverage:
+	.venv/bin/pytest tests/ --cov=engine --cov=pipeline --cov=api --cov=workers --cov=db --cov=config --cov=telemetry --cov-report=term
 
 db-upgrade:
 	.venv/bin/alembic upgrade head
