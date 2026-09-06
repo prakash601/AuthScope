@@ -23,13 +23,6 @@ jobs:
         image: redis:7-alpine
         ports: ["6379:6379"]
         options: --health-cmd "redis-cli ping" --health-interval 5s
-      minio:
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: authscope-dev
-          MINIO_ROOT_PASSWORD: authscope-dev-secret
-        ports: ["9000:9000"]
-        options: --health-cmd "mc ready local" --health-interval 5s
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
@@ -49,11 +42,22 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]"
       - run: playwright install --with-deps chromium
+      - name: start MinIO
+        run: |
+          docker run -d --name minio --network host \
+            -e MINIO_ROOT_USER=authscope-dev \
+            -e MINIO_ROOT_PASSWORD=authscope-dev-secret \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+          curl -sf http://localhost:9000/minio/health/live
       - name: create MinIO bucket
         run: |
           docker run --rm --network host \
             -e MC_HOST_local="http://authscope-dev:authscope-dev-secret@localhost:9000" \
-            bitnami/mc:latest mc mb --ignore-existing local/authscope-artifacts
+            minio/mc:latest mc mb --ignore-existing local/authscope-artifacts
       - name: lint
         run: ruff check api engine pipeline workers db telemetry.py tests
       - name: typecheck
