@@ -87,55 +87,74 @@ async def _run_scan(scan_id: str) -> str:
 
         await _set_status(session_factory, scan_id, "running")
 
-        attempt = 1
-        country = requested_country
-        tried_countries: set[str] = {country} if country else set()
+        try:
+            attempt = 1
+            country = requested_country
+            tried_countries: set[str] = {country} if country else set()
 
-        while True:
-            proxy_url = proxy_manager.get_proxy(country)
-            deep_scan = bool(opts.get("deep_scan", False))
-            artifact, capture = await _scan_once(settings, proxy_url, url, deep_scan)
-            opts = {**opts, "attempts": attempt, "attempted_proxies": sorted(tried_countries)}
+            while True:
+                proxy_url = proxy_manager.get_proxy(country)
+                deep_scan = bool(opts.get("deep_scan", False))
+                artifact, capture = await _scan_once(settings, proxy_url, url, deep_scan)
+                opts = {**opts, "attempts": attempt, "attempted_proxies": sorted(tried_countries)}
 
-            if not artifact.blocked or not should_retry_blocked(
-                attempt, settings.scan.retry_blocked_once
-            ):
-                final_status = "waf_blocked" if artifact.blocked else "completed"
-                await _finalize(
-                    settings,
-                    session_factory,
+                if not artifact.blocked or not should_retry_blocked(
+                    attempt, settings.scan.retry_blocked_once
+                ):
+                    final_status = "waf_blocked" if artifact.blocked else "completed"
+                    await _finalize(
+                        settings,
+                        session_factory,
+                        scan_id,
+                        normalized,
+                        artifact,
+                        capture,
+                        final_status,
+                        opts,
+                    )
+                    logger.info(
+                        "scan %s finished status=%s attempt=%d country=%s",
+                        scan_id,
+                        final_status,
+                        attempt,
+                        country,
+                    )
+                    return final_status
+
+                # Blocked on first attempt -> one retry via a different exit country.
+                new_proxy, new_country = proxy_manager.get_different_country_proxy(country)
+                logger.warning(
+                    "scan %s blocked on attempt %d (country=%s); retrying via country=%s",
                     scan_id,
-                    normalized,
-                    artifact,
-                    capture,
-                    final_status,
-                    opts,
-                )
-                logger.info(
-                    "scan %s finished status=%s attempt=%d country=%s",
-                    scan_id,
-                    final_status,
                     attempt,
                     country,
+                    new_country,
                 )
-                return final_status
-
-            # Blocked on first attempt -> one retry via a different exit country.
-            new_proxy, new_country = proxy_manager.get_different_country_proxy(country)
-            logger.warning(
-                "scan %s blocked on attempt %d (country=%s); retrying via country=%s",
-                scan_id,
-                attempt,
-                country,
-                new_country,
-            )
-            if new_proxy is not None and new_country is not None:
-                country = new_country
-                tried_countries.add(new_country)
-            await _update_options(session_factory, scan_id, opts)
-            attempt += 1
+                if new_proxy is not None and new_country is not None:
+                    country = new_country
+                    tried_countries.add(new_country)
+                await _update_options(session_factory, scan_id, opts)
+                attempt += 1
+        except Exception as exc:
+            # Never leave a scan stuck in 'running': record the failure loudly.
+            await _mark_failed(session_factory, scan_id, exc)
+            raise
     finally:
         await engine.dispose()
+
+
+async def _mark_failed(session_factory, scan_id: str, exc: BaseException) -> None:
+    """Best-effort transition to failed with a truncated error detail."""
+    try:
+        detail = f"{type(exc).__name__}: {exc}"[:500]
+        async with session_factory() as session, session.begin():
+            await session.execute(
+                sa.text(
+                    "UPDATE scans SET status = 'failed', error_detail = :e WHERE id = :i"
+                ).bindparams(e=detail, i=uuid.UUID(scan_id))
+            )
+    except Exception:  # noqa: BLE001 — must not mask the original error
+        logger.exception("failed to mark scan %s failed", scan_id)
 
 
 async def _set_status(session_factory, scan_id: str, status: str) -> None:

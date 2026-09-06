@@ -483,6 +483,15 @@
 ### How to verify
 - `pytest tests/test_observability.py tests/test_dashboard_and_policy.py` green (16 passed).
 
+## T15 — CI repair: MinIO images + NoSuchBucket hardening (2026-09-07)
+### What was done
+- CI failed on `bitnami/minio:latest` (image removed upstream) — MinIO now runs via `docker run minio/minio:latest server /data` with a health gate; `minio/mc` for bucket bootstrap; bucket existence verified with `mc stat` (fail fast).
+- Real defect the outage exposed: `upload_evidence` hard-required a pre-provisioned bucket. Added idempotent `ensure_bucket` (head → create on 404) called on every upload.
+- Same incident exposed scans stuck `running` forever on mid-pipeline crashes: `_run_scan` now marks `failed` + truncated `error_detail` (best-effort) and re-raises.
+- Test bug: eager fixture set bogus `task_propagates` (real setting is `task_eager_propagates`) — failures were swallowed in tests, hiding the above. Fixed + added `test_unexpected_failure_marks_scan_failed`.
+### How to verify
+- `pytest tests/test_worker_scans.py tests/test_evidence_service.py` green; full suite 158 passed.
+
 
 
 

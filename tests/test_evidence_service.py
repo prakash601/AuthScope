@@ -86,3 +86,22 @@ def json_loads(data: bytes) -> dict:
     import json
 
     return json.loads(data)
+
+
+def test_ensure_bucket_idempotent_on_existing():
+    from pipeline.evidence import ensure_bucket
+
+    assert ensure_bucket(_client(), _bucket()) == _bucket()
+
+
+def test_ensure_bucket_creates_missing():
+    from pipeline.evidence import ensure_bucket
+
+    name = f"authscope-test-{uuid.uuid4().hex[:8]}"
+    c = _client()
+    try:
+        assert ensure_bucket(c, name) == name
+        c.head_bucket(Bucket=name)  # created
+        assert ensure_bucket(c, name) == name  # idempotent
+    finally:
+        c.delete_bucket(Bucket=name)

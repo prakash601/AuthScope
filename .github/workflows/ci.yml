@@ -58,6 +58,9 @@ jobs:
           docker run --rm --network host \
             -e MC_HOST_local="http://authscope-dev:authscope-dev-secret@localhost:9000" \
             minio/mc:latest mc mb --ignore-existing local/authscope-artifacts
+          docker run --rm --network host \
+            -e MC_HOST_local="http://authscope-dev:authscope-dev-secret@localhost:9000" \
+            minio/mc:latest mc stat local/authscope-artifacts
       - name: lint
         run: ruff check api engine pipeline workers db telemetry.py tests
       - name: typecheck
