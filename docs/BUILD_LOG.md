@@ -394,6 +394,14 @@
 ### How to verify
 - Re-run: `make compose-up && make db-upgrade && .venv/bin/python -m db.seed && make signatures-load && make test`.
 
+## T04 — Canned demo pack (2026-09-06)
+### What was done
+- `scripts/demo.py`: offline 3-target showcase (auth0 / turnstile-visible / waf-cookies) through real Chromium + all 5 detectors + aggregate/score; exits non-zero on mismatch. Run via `make demo`.
+- `docs/DEMO.md`: walkthrough — offline demo table, full API curl flow, dashboard path, evidence notes.
+- `Makefile`: `demo` target; `.gitignore`: ignore `.coverage*`/`htmlcov/`.
+### How to verify
+- `make demo` → `demo: all PASS` (3/3).
+
 
 
 

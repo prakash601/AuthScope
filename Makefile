@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test coverage db-upgrade db-downgrade run-api run-worker compose-up compose-down signatures-load
+.PHONY: install lint format typecheck test coverage db-upgrade db-downgrade run-api run-worker compose-up compose-down signatures-load demo
 
 install:
 	python3 -m venv .venv && .venv/bin/pip install -U pip
@@ -42,3 +42,6 @@ compose-down:
 
 signatures-load:
 	.venv/bin/python -m db.load_signatures
+
+demo:
+	PYTHONPATH=. .venv/bin/python scripts/demo.py
