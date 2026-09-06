@@ -14,7 +14,9 @@
 ### waf_blocked spike (alert: AuthScopeWafBlockedSpike)
 - Cause: proxy pool burned or a target hardened its protection.
 - Action: rotate proxy credentials; check per-country success in scan options
-  (`attempted_proxies`); consider lowering submission rate for affected targets.
+  (`attempted_proxies`) and worker `proxy acquired country=...` logs;
+  pool JSON is validated at load (bad URLs fail fast) — see `workers/proxy.py`.
+  Consider lowering submission rate for affected targets.
 
 ### Scan failure spike (alert: AuthScopeScanFailureSpike)
 - Check worker logs for OOM kills: `kubectl logs -l app=authscope,tier=worker --previous`.

@@ -411,6 +411,13 @@
 ### How to verify
 - `pytest tests/test_deploy_policy.py` green (no infra needed).
 
+## T06 — Production-ready proxy pool (2026-09-06)
+### What was done
+- `workers/proxy.py`: pool URLs validated at load (scheme allowlist, JSON shape — fail fast); unknown requested country falls back to random with warning; per-country usage counters + redacted-host acquire logs; credentials never logged (`redact_proxy_url`); docstring documents provider plug-in + secret-store sourcing.
+- `tests/test_proxy_pool.py` (8 tests): direct-mode, rejection paths, fallback, retry, redaction, usage counts.
+### How to verify
+- `pytest tests/test_proxy_pool.py tests/test_worker_scans.py` green (13 passed).
+
 
 
 
