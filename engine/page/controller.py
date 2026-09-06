@@ -31,11 +31,26 @@ CHALLENGE_MARKERS: tuple[str, ...] = (
 )
 
 
-def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
+def _har_time(ts: float | None) -> str:
+    """Format epoch seconds as HAR ISO-8601; never emit the 1970 stub."""
+    from datetime import UTC, datetime
+
+    if ts is None:
+        ts = time.time()
+    return datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
+
+
+def build_har(
+    entries: list[CapturedRequest], page_url: str, scan_started_at: float | None = None
+) -> dict:
     """Assemble a HAR 1.2 document from captured requests."""
+    page_started = _har_time(scan_started_at)
     har_entries = []
     for r in entries:
-        started = "1970-01-01T00:00:00.000Z"
+        started = _har_time(r.started_at or scan_started_at)
+        elapsed = r.duration_ms if r.duration_ms is not None else 0
         qs_pos = r.url.find("?")
         qs = []
         if qs_pos != -1:
@@ -45,7 +60,7 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
         har_entries.append(
             {
                 "startedDateTime": started,
-                "time": -1,
+                "time": elapsed,
                 "_resourceType": r.resource_type,
                 "request": {
                     "method": r.method,
@@ -69,7 +84,7 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
                     "bodySize": 0,
                 },
                 "cache": {},
-                "timings": {"send": 0, "wait": -1, "receive": 0},
+                "timings": {"send": 0, "wait": elapsed, "receive": 0},
             }
         )
     return {
@@ -81,7 +96,7 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
                     "id": "page_1",
                     "pageTimings": {},
                     "title": page_url,
-                    "startedDateTime": "1970-01-01T00:00:00.000Z",
+                    "startedDateTime": page_started,
                 }
             ],
             "entries": har_entries,
@@ -148,6 +163,7 @@ class PageController:
         context = managed.context
         page = await context.new_page()
         started = time.monotonic()
+        scan_started_at = time.time()
         requests: dict[str, CapturedRequest] = {}
         main_response_headers: dict[str, str] = {}
         main_status: int | None = None
@@ -164,10 +180,15 @@ class PageController:
         async def on_response(response: Response) -> None:
             nonlocal main_status, final_url, main_response_headers
             req: Request = response.request
+            now = time.time()
             entry = requests.setdefault(
                 req.url,
                 CapturedRequest(url=req.url, method=req.method, resource_type=req.resource_type),
             )
+            if entry.started_at is None:
+                entry.started_at = now
+            else:
+                entry.duration_ms = max(0, int((now - entry.started_at) * 1000))
             entry.is_xhr_fetch = entry.is_xhr_fetch or req.resource_type in ("xhr", "fetch")
             with contextlib.suppress(Exception):  # response may be gone already
                 entry.status = response.status
@@ -187,6 +208,8 @@ class PageController:
                 req.url,
                 CapturedRequest(url=req.url, method=req.method, resource_type=req.resource_type),
             )
+            if entry.started_at is None:
+                entry.started_at = time.time()
             entry.request_headers = {k.lower(): v for k, v in req.headers.items()}
 
         page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
@@ -265,7 +288,7 @@ class PageController:
             logger.debug("screenshot failed", exc_info=True)
         await page.close()
 
-        har = build_har(request_list, url)
+        har = build_har(request_list, url, scan_started_at)
         artifact = PageArtifact(
             url=url,
             final_url=final_url,

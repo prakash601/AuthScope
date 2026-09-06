@@ -368,6 +368,16 @@
 - Live load validation through real Celery + Chromium completed with zero errors.
 - All milestones (M0–M4) complete: detection engine, API platform, scoring, diffing, feedback loop, observability, dashboard, and deployment packaging.
 
+## T01 — Detector correctness: Arkose key + real HAR timings (2026-09-06)
+### What was done
+- `engine/detectors/captcha.py`: renamed widget-marker key `arkose_funcaptcha` → `arkose_funaptcha` to match `signatures/captcha.yaml`, so Arkose widget pages report `visible=true` / `challenge_visible`.
+- `engine/artifacts.py`: added `CapturedRequest.started_at` + `duration_ms` (optional, backward-compatible).
+- `engine/page/controller.py`: `on_request` stamps wall time, `on_response` computes duration, `build_har(entries, url, scan_started_at)` emits real ISO-8601 `startedDateTime` and `time`/`timings.wait`; page `startedDateTime` uses scan start. No more `1970-01-01` stub or `time: -1`.
+- `tests/test_detectors.py`: added `test_arkose_funaptcha_visible_vs_script_only` regression test.
+### How to verify
+- `.venv/bin/python -m pytest tests/test_detectors.py tests/test_browser_integration.py::test_har_valid_json_and_screenshot -q` green; ruff + mypy clean.
+- Manual: `build_har` output contains no `1970`, entry `time` equals measured duration.
+
 
 
 

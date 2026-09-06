@@ -25,7 +25,7 @@ class CaptchaDetector(Detector):
             "hcaptcha": ("h-captcha", "hcaptcha.com/1/captcha"),
             "turnstile_managed": ("cf-turnstile",),
             "turnstile_non_interactive": (),
-            "arkose_funcaptcha": ("funcaptcha", "arkose"),
+            "arkose_funaptcha": ("funcaptcha", "arkose"),
             "geetest_v3": ("geetest_radar_tip", "gt_slider", "geetest_box"),
             "geetest_v4": ("geetest_box", "captcha-box"),
         }

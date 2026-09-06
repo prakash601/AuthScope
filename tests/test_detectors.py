@@ -316,6 +316,25 @@ async def test_recaptcha_v2_checkbox_visible(all_sigs):
     assert top.extra["visible"] is True and top.extra["score_based"] is False
 
 
+async def test_arkose_funaptcha_visible_vs_script_only(all_sigs):
+    widget = make_artifact(
+        dom=DomSummary(
+            scripts=["https://client-api.arkoselabs.com/v2/1.5.5/index.js"],
+            raw_html='<div id="funcaptcha"></div>',
+        )
+    )
+    script_only = make_artifact(
+        dom=DomSummary(scripts=["https://client-api.arkoselabs.com/v2/1.5.5/index.js"])
+    )
+    w = await CaptchaDetector(all_sigs).detect(widget)
+    ark = [f for f in w if f.name == "arkose_funaptcha"][0]
+    assert ark.extra["visible"] is True
+    assert ark.extra["variant"] == "challenge_visible"
+    s = await CaptchaDetector(all_sigs).detect(script_only)
+    ark2 = [f for f in s if f.name == "arkose_funaptcha"][0]
+    assert ark2.extra["visible"] is False
+
+
 async def test_waf_headers_cookies_and_interstitial(all_sigs):
     cookie_only = make_artifact(
         cookies=[CookieInfo(name="_abck", value="v")],
