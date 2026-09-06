@@ -67,6 +67,8 @@ jobs:
         run: mypy config.py api engine pipeline workers db telemetry.py
       - name: migrations
         run: alembic upgrade head
+      - name: load signatures
+        run: python -m db.load_signatures
       - name: tests with coverage
         run: >
           pytest tests/
