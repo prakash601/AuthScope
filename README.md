@@ -517,6 +517,7 @@ https://site-b.com/signin
 ```
 
 Accepts up to 1000 URLs; returns a batch id and per-URL scan ids.
+Track progress via `GET /v1/scans/bulk/{batch_id}` (total + per-status counts).
 
 ### Other endpoints
 

@@ -426,6 +426,13 @@
 ### How to verify
 - `pytest tests/test_webhooks.py` green (6 passed: signing, retry, DLQ, CRUD, list+redrive, unknown-id).
 
+## T08 — Bulk batch progress endpoint (2026-09-06)
+### What was done
+- `api/routes/scans.py`: `GET /v1/scans/bulk/{batch_id}` aggregates owner-scoped scans by `options.batch_id` (JSONB) into `{total, by_status{queued,running,completed,failed,waf_blocked}}`; 404 for unknown/other-owner batches.
+- `README.md` bulk section documents the progress endpoint.
+### How to verify
+- `pytest tests/test_bulk_api.py` green (6 passed).
+
 
 
 
