@@ -58,6 +58,32 @@ HOOKS_JS = r"""
     };
   });
 
+  // --- WebSocket + EventSource wrappers ---
+  safe(() => {
+    const OrigWS = window.WebSocket;
+    if (!OrigWS) { return; }
+    window.WebSocket = function(url, protocols) {
+      try {
+        state.hookLog.push({kind: 'ws', method: 'CONNECT', url: String(url)});
+      } catch (e) {}
+      return protocols === undefined
+        ? new OrigWS(url)
+        : new OrigWS(url, protocols);
+    };
+    window.WebSocket.prototype = OrigWS.prototype;
+  });
+  safe(() => {
+    const OrigES = window.EventSource;
+    if (!OrigES) { return; }
+    window.EventSource = function(url, init) {
+      try {
+        state.hookLog.push({kind: 'sse', method: 'SUBSCRIBE', url: String(url)});
+      } catch (e) {}
+      return new OrigES(url, init);
+    };
+    window.EventSource.prototype = OrigES.prototype;
+  });
+
   // --- fingerprint read counters ---
   safe(() => {
     const proto = HTMLCanvasElement.prototype;

@@ -453,6 +453,14 @@
 ### How to verify
 - Re-run: start API/worker/fixture, `scripts/loadtest.py --key <high-limit-key> --target <fixture> --total 10 --concurrency 10 --poll-timeout 400`.
 
+## T11 — Engine completeness (2026-09-06)
+### What was done
+- Response bodies: `CapturedRequest.response_body` (+truncated flag, 64KB cap, text-ish only) captured when `deep_scan=true`; wired the previously dead API `deep_scan` option through `workers/tasks.py` → `PageController.run`.
+- Hooks: `HOOKS_JS` now wraps `WebSocket` + `EventSource` (kind `ws`/`sse` in hook log); new `ws_page.html` / `sse_page.html` fixtures + browser tests.
+- Schema guard: `test_committed_schema_matches_model` fails CI on `ScanReport` drift (regen via `ScanReport.model_json_schema()`; hand-set `$id`/title normalized).
+### How to verify
+- `pytest tests/test_browser_integration.py tests/test_aggregator.py tests/test_worker_scans.py` green.
+
 
 
 

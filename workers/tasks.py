@@ -93,7 +93,8 @@ async def _run_scan(scan_id: str) -> str:
 
         while True:
             proxy_url = proxy_manager.get_proxy(country)
-            artifact, capture = await _scan_once(settings, proxy_url, url)
+            deep_scan = bool(opts.get("deep_scan", False))
+            artifact, capture = await _scan_once(settings, proxy_url, url, deep_scan)
             opts = {**opts, "attempts": attempt, "attempted_proxies": sorted(tried_countries)}
 
             if not artifact.blocked or not should_retry_blocked(
@@ -155,7 +156,7 @@ async def _update_options(session_factory, scan_id: str, options_patch: dict) ->
         )
 
 
-async def _scan_once(settings, proxy_url: str | None, url: str):
+async def _scan_once(settings, proxy_url: str | None, url: str, deep_scan: bool = False):
     """One navigation attempt in a fresh browser context."""
     from engine.browser.context_manager import BrowserContextManager
     from engine.page.controller import PageController
@@ -167,7 +168,7 @@ async def _scan_once(settings, proxy_url: str | None, url: str):
         controller = PageController(
             lazy_captcha_wait_seconds=settings.scan.lazy_captcha_wait_seconds
         )
-        result = await controller.run(managed, url)
+        result = await controller.run(managed, url, deep_scan=deep_scan)
         await mgr.release(managed)
         return result.artifact, result
     finally:

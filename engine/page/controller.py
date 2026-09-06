@@ -30,6 +30,15 @@ CHALLENGE_MARKERS: tuple[str, ...] = (
     "_Incapsula_resource",
 )
 
+# Deep-scan body capture: text-ish payloads only, hard-capped per response.
+DEEP_SCAN_BODY_CAP = 65_536
+_TEXT_BODY_HINTS = ("text/", "json", "javascript", "xml", "urlencoded")
+
+
+def _is_text_body(content_type: str) -> bool:
+    ct = content_type.lower()
+    return not ct or any(h in ct for h in _TEXT_BODY_HINTS)
+
 
 def _har_time(ts: float | None) -> str:
     """Format epoch seconds as HAR ISO-8601; never emit the 1970 stub."""
@@ -37,8 +46,8 @@ def _har_time(ts: float | None) -> str:
 
     if ts is None:
         ts = time.time()
-    return datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="milliseconds").replace(
-        "+00:00", "Z"
+    return (
+        datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     )
 
 
@@ -75,9 +84,7 @@ def build_har(
                     "status": r.status or 0,
                     "statusText": "",
                     "httpVersion": "HTTP/1.1",
-                    "headers": [
-                        {"name": k, "value": v} for k, v in r.response_headers.items()
-                    ],
+                    "headers": [{"name": k, "value": v} for k, v in r.response_headers.items()],
                     "content": {"size": 0, "mimeType": r.response_headers.get("content-type", "")},
                     "redirectURL": r.response_headers.get("location", ""),
                     "headersSize": -1,
@@ -195,6 +202,17 @@ class PageController:
                 entry.response_headers = {
                     k.lower(): v for k, v in (await response.all_headers()).items()
                 }
+            if deep_scan and entry.response_body is None:
+                with contextlib.suppress(Exception):
+                    ctype = entry.response_headers.get("content-type", "")
+                    if _is_text_body(ctype):
+                        raw = await response.body()
+                        text = raw.decode("utf-8", errors="replace")
+                        if len(text) > DEEP_SCAN_BODY_CAP:
+                            entry.response_body = text[:DEEP_SCAN_BODY_CAP]
+                            entry.response_body_truncated = True
+                        else:
+                            entry.response_body = text
             if response.request.is_navigation_request() and response.frame == page.main_frame:
                 main_status = response.status
                 final_url = response.url
