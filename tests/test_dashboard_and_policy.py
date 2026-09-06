@@ -18,6 +18,20 @@ async def test_dashboard_assets_served(app_client):
         assert r.status_code == 200, asset
 
 
+async def test_dashboard_evidence_viewer_and_filters(app_client):
+    """T13: HAR explorer block, WAF filter input, and their JS wiring exist."""
+    _, client = app_client
+    index = (await client.get("/dashboard/")).text
+    assert 'id="har-explorer"' in index
+    assert 'id="btn-har"' in index and 'id="har-filter"' in index
+    assert 'id="har-table"' in index
+    assert 'id="f-waf"' in index
+
+    js = (await client.get("/dashboard/app.js")).text
+    assert "waf_provider" in js  # list filter parity with the API
+    assert "harEntries" in js and "renderHar" in js
+
+
 async def test_report_includes_disclaimer(app_client, user_and_key):
     """Detection-only disclaimer is surfaced in every report response."""
     import sqlalchemy as sa

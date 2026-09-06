@@ -48,6 +48,7 @@
       <div class="filters">
         <input id="f-provider" placeholder="provider (e.g. auth0)">
         <input id="f-captcha" placeholder="captcha type">
+        <input id="f-waf" placeholder="waf provider">
         <input id="f-min-diff" placeholder="min difficulty" type="number">
         <select id="f-status">
           <option value="">any status</option>
@@ -76,6 +77,16 @@
       <div id="report-antibot"></div>
       <h3>Evidence</h3>
       <div id="report-artifacts"></div>
+      <h3>HAR explorer</h3>
+      <div id="har-explorer">
+        <button id="btn-har">Load HAR entries</button>
+        <input id="har-filter" class="mono" placeholder="filter by URL substring">
+        <div id="har-summary" class="mono"></div>
+        <table id="har-table">
+          <thead><tr><th>Method</th><th>URL</th><th>Status</th><th>Time (ms)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <pre id="report-raw" class="mono"></pre>
     </div>
   </section>

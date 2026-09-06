@@ -469,6 +469,13 @@
 ### How to verify
 - `alembic upgrade head` shows the index; `pytest tests/test_diff.py tests/test_models_roundtrip.py` green.
 
+## T13 — Dashboard evidence viewer (2026-09-06)
+### What was done
+- `dashboard/index.html` + `app.js`: fetch-on-demand HAR explorer (entry count, URL-substring filter, 500-row cap, click-to-expand request headers with HTML-escaping for page-controlled URLs) + WAF provider list filter (full parity with `GET /v1/scans` filters). Screenshot thumbnail + artifact links unchanged.
+- `tests/test_dashboard_and_policy.py`: static assertions for the explorer block, WAF input, and JS wiring.
+### How to verify
+- `node --check dashboard/app.js`; `pytest tests/test_dashboard_and_policy.py` green (5 passed); manual: report → Load HAR entries → filter + expand.
+
 
 
 
