@@ -76,9 +76,7 @@ async def _run_scan(scan_id: str) -> str:
     try:
         async with session_factory() as session:
             scan = (
-                await session.execute(
-                    sa.select(Scan).where(Scan.id == uuid.UUID(scan_id))
-                )
+                await session.execute(sa.select(Scan).where(Scan.id == uuid.UUID(scan_id)))
             ).scalar_one_or_none()
             if scan is None:
                 raise ValueError(f"scan {scan_id} not found")
@@ -96,20 +94,28 @@ async def _run_scan(scan_id: str) -> str:
         while True:
             proxy_url = proxy_manager.get_proxy(country)
             artifact, capture = await _scan_once(settings, proxy_url, url)
-            opts = {**opts, "attempts": attempt,
-                    "attempted_proxies": sorted(tried_countries)}
+            opts = {**opts, "attempts": attempt, "attempted_proxies": sorted(tried_countries)}
 
             if not artifact.blocked or not should_retry_blocked(
                 attempt, settings.scan.retry_blocked_once
             ):
                 final_status = "waf_blocked" if artifact.blocked else "completed"
                 await _finalize(
-                    settings, session_factory, scan_id, normalized,
-                    artifact, capture, final_status, opts,
+                    settings,
+                    session_factory,
+                    scan_id,
+                    normalized,
+                    artifact,
+                    capture,
+                    final_status,
+                    opts,
                 )
                 logger.info(
                     "scan %s finished status=%s attempt=%d country=%s",
-                    scan_id, final_status, attempt, country,
+                    scan_id,
+                    final_status,
+                    attempt,
+                    country,
                 )
                 return final_status
 
@@ -117,7 +123,10 @@ async def _run_scan(scan_id: str) -> str:
             new_proxy, new_country = proxy_manager.get_different_country_proxy(country)
             logger.warning(
                 "scan %s blocked on attempt %d (country=%s); retrying via country=%s",
-                scan_id, attempt, country, new_country,
+                scan_id,
+                attempt,
+                country,
+                new_country,
             )
             if new_proxy is not None and new_country is not None:
                 country = new_country
@@ -202,9 +211,7 @@ async def _finalize(
     outcomes = await run_detectors(detectors, artifact)
     findings = [f for outcome in outcomes for f in outcome.findings]
     for outcome in outcomes:
-        DETECTOR_DURATION.labels(detector=outcome.detector).observe(
-            outcome.duration_ms / 1000
-        )
+        DETECTOR_DURATION.labels(detector=outcome.detector).observe(outcome.duration_ms / 1000)
 
     report, _scores = aggregate(
         scan_id,
@@ -230,15 +237,11 @@ async def _finalize(
         async with session.begin():
             await persist_report(session, report)
             await session.execute(
-                sa.update(Scan)
-                .where(Scan.id == uuid.UUID(scan_id))
-                .values(options=options_patch)
+                sa.update(Scan).where(Scan.id == uuid.UUID(scan_id)).values(options=options_patch)
             )
         row = (
             await session.execute(
-                sa.text("SELECT user_id FROM scans WHERE id = :i").bindparams(
-                    i=uuid.UUID(scan_id)
-                )
+                sa.text("SELECT user_id FROM scans WHERE id = :i").bindparams(i=uuid.UUID(scan_id))
             )
         ).first()
         if row and row.user_id:
@@ -246,8 +249,7 @@ async def _finalize(
             hooks = (
                 await session.execute(
                     sa.text(
-                        "SELECT url, secret FROM webhooks "
-                        "WHERE user_id = :u AND active = true"
+                        "SELECT url, secret FROM webhooks WHERE user_id = :u AND active = true"
                     ).bindparams(u=uuid.UUID(user_id))
                 )
             ).all()
@@ -259,7 +261,11 @@ async def _finalize(
         redis = aioredis.from_url(settings.redis_url, decode_responses=True)
         try:
             await dispatch_report(
-                redis, webhook_pairs, report.model_dump(mode="json"), scan_id
+                redis,
+                webhook_pairs,
+                report.model_dump(mode="json"),
+                scan_id,
+                user_id=user_id,
             )
         finally:
             await redis.aclose()
@@ -271,8 +277,7 @@ async def _finalize(
         ttl_hours = getattr(settings.scan, "result_cache_ttl_hours", 6)
         r2 = aioredis2.from_url(settings.redis_url, decode_responses=True)
         try:
-            await r2.set(result_cache_key(normalized_url), scan_id,
-                         ex=max(60, ttl_hours * 3600))
+            await r2.set(result_cache_key(normalized_url), scan_id, ex=max(60, ttl_hours * 3600))
         finally:
             await r2.aclose()
 

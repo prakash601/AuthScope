@@ -8,6 +8,7 @@ import hmac
 import json
 import logging
 import time
+import uuid
 
 import httpx
 
@@ -59,9 +60,33 @@ async def deliver(
             await c.aclose()
 
 
-async def dead_letter(redis, entry: dict) -> None:
-    """Push an undeliverable webhook onto the Redis DLQ (observable)."""
-    await redis.rpush(DLQ_KEY, json.dumps({**entry, "dead_lettered_at": time.time()}))
+async def dead_letter(redis, entry: dict) -> str:
+    """Push an undeliverable webhook onto the Redis DLQ (observable).
+
+    Returns the assigned DLQ id used to address the entry for re-drive.
+    """
+    dlq_id = uuid.uuid4().hex
+    await redis.rpush(
+        DLQ_KEY, json.dumps({**entry, "dlq_id": dlq_id, "dead_lettered_at": time.time()})
+    )
+    return dlq_id
+
+
+async def list_dlq(redis) -> list[tuple[str, dict]]:
+    """All DLQ entries as (raw, parsed) pairs; unparsable raws are skipped."""
+    raws = await redis.lrange(DLQ_KEY, 0, -1)
+    out: list[tuple[str, dict]] = []
+    for raw in raws:
+        try:
+            out.append((raw, json.loads(raw)))
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return out
+
+
+async def remove_dlq_entry(redis, raw: str) -> int:
+    """Remove one occurrence of a DLQ entry by its exact raw value."""
+    return await redis.lrem(DLQ_KEY, 1, raw)
 
 
 async def dispatch_report(
@@ -69,6 +94,7 @@ async def dispatch_report(
     webhooks: list[tuple[str, str]],
     report: dict,
     scan_id: str,
+    user_id: str | None = None,
 ) -> dict[str, str]:
     """Send the report to every registered webhook. Returns url -> status."""
     statuses: dict[str, str] = {}
@@ -78,6 +104,6 @@ async def dispatch_report(
         if not delivered:
             await dead_letter(
                 redis,
-                {"url": url, "scan_id": scan_id, "error": error},
+                {"url": url, "scan_id": scan_id, "error": error, "user_id": user_id},
             )
     return statuses

@@ -418,6 +418,14 @@
 ### How to verify
 - `pytest tests/test_proxy_pool.py tests/test_worker_scans.py` green (13 passed).
 
+## T07 — Webhook DLQ re-drive API (2026-09-06)
+### What was done
+- `workers/webhooks.py`: DLQ entries carry `dlq_id` + `user_id`; added `list_dlq`/`remove_dlq_entry`; `dispatch_report` tags entries with the scan owner's id.
+- `api/routes/webhooks.py`: `GET /v1/webhooks/dlq` (owner-scoped list), `POST /v1/webhooks/dlq/{id}/redrive` (looks up active webhook secret, rebuilds report from DB, re-delivers signed, drops entry on success; 404/409/502 otherwise).
+- `README.md` endpoint table + webhook section document the DLQ flow.
+### How to verify
+- `pytest tests/test_webhooks.py` green (6 passed: signing, retry, DLQ, CRUD, list+redrive, unknown-id).
+
 
 
 

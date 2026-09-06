@@ -527,10 +527,12 @@ Accepts up to 1000 URLs; returns a batch id and per-URL scan ids.
 | `POST` | `/v1/scans/{id}/feedback` | Flag false positives / confirm detections |
 | `GET` | `/v1/signatures` | List active signatures (debugging/transparency) |
 | `POST` | `/v1/webhooks` | Register webhook endpoints |
+| `GET` | `/v1/webhooks/dlq` | List dead-lettered deliveries (re-drive candidates) |
+| `POST` | `/v1/webhooks/dlq/{id}/redrive` | Re-deliver one dead-lettered webhook |
 
 ### Webhook payload
 
-On scan completion, registered endpoints receive a signed POST containing the same report JSON as `GET /v1/scans/{id}`. Failed deliveries retry with exponential backoff.
+On scan completion, registered endpoints receive a signed POST containing the same report JSON as `GET /v1/scans/{id}`. Failed deliveries retry with exponential backoff, then land in the DLQ (`GET /v1/webhooks/dlq`) for manual re-drive.
 
 ---
 
