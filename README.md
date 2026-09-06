@@ -631,8 +631,8 @@ cd authscope
 make install            # venv, deps, chromium
 make compose-up         # postgres + redis + minio
 make db-upgrade         # schema migrations
-python -m db.seed       # dev API key ("dev-key")
-python -m db.load_signatures   # load 74 detection signatures
+.venv/bin/python -m db.seed       # dev API key ("dev-key")
+make signatures-load    # load 74 detection signatures (.venv/bin/python -m db.load_signatures)
 
 # terminal 1
 make run-api            # http://localhost:8000 (docs at /docs)
@@ -665,7 +665,7 @@ Other useful commands: `make test` (130 tests), `make coverage` (90% overall), `
 
 ## License
 
-TBD.
+Proprietary — see [LICENSE](./LICENSE). Contact hello@authscope.dev for licensing inquiries.
 
 ## Disclaimer
 

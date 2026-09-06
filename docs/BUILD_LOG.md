@@ -378,6 +378,14 @@
 - `.venv/bin/python -m pytest tests/test_detectors.py tests/test_browser_integration.py::test_har_valid_json_and_screenshot -q` green; ruff + mypy clean.
 - Manual: `build_har` output contains no `1970`, entry `time` equals measured duration.
 
+## T02 — Repo hygiene: website tracked + license settled (2026-09-06)
+### What was done
+- Tracked `website/index.html` + `website/styles.css` (were untracked); `git status` now clean apart from venv/cache (all ignored).
+- Added `LICENSE` (proprietary, matches `pyproject.toml` + website footer); `README.md` License section points at it instead of `TBD`.
+- `README.md` Getting Started now uses `.venv/bin/python -m db.seed` and `make signatures-load` to match the Makefile exactly.
+### How to verify
+- `git status --short` shows no `?? website/`; `ruff check` clean; `ls LICENSE` present.
+
 
 
 
