@@ -9,6 +9,12 @@
 4. Roll API + workers: `kubectl apply -f deploy/k8s/api.yaml deploy/k8s/worker.yaml`.
 5. Verify: `/healthz` on the API service; Grafana dashboard `authscope-overview`.
 
+## Observability (local)
+`make compose-up` also starts Prometheus (`:9090`, alerts from
+`deploy/prometheus/alerts.yml`) and Grafana (`:3000`, admin credentials via
+`GRAFANA_ADMIN_USER/_PASSWORD`, dashboard auto-provisioned). Prometheus scrapes
+the host API at `host.docker.internal:8000/metrics` while `make run-api` runs.
+
 ## Common failures
 
 ### waf_blocked spike (alert: AuthScopeWafBlockedSpike)

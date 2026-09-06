@@ -111,3 +111,43 @@ def test_setup_tracing_noop_without_endpoint(monkeypatch):
 
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     assert telemetry.setup_tracing() is False
+
+
+def test_compose_wires_observability_stack():
+    import yaml
+
+    compose = yaml.safe_load((Path(__file__).parent.parent / "docker-compose.yml").read_text())
+    services = compose["services"]
+    assert "prometheus" in services and "grafana" in services
+    prom_mounts = [str(v) for v in services["prometheus"].get("volumes", [])]
+    assert any("alerts.yml" in m for m in prom_mounts)
+    assert any("prometheus.yml" in m for m in prom_mounts)
+    graf_mounts = [str(v) for v in services["grafana"].get("volumes", [])]
+    assert any("provisioning" in m for m in graf_mounts)
+    assert any("dashboard.json" in m for m in graf_mounts)
+
+
+def test_prometheus_scrape_config_valid():
+    import yaml
+
+    cfg = yaml.safe_load((DEPLOY / "prometheus" / "prometheus.yml").read_text())
+    assert any("alerts.yml" in r for r in cfg.get("rule_files", []))
+    jobs = {j["job_name"]: j for j in cfg["scrape_configs"]}
+    assert "authscope-api" in jobs
+    api = jobs["authscope-api"]
+    assert api.get("metrics_path") == "/metrics"
+    targets = [t for s in api["static_configs"] for t in s["targets"]]
+    assert any("8000" in t for t in targets)
+
+
+def test_grafana_provisioning_valid():
+    import yaml
+
+    ds = yaml.safe_load(
+        (DEPLOY / "grafana" / "provisioning" / "datasources" / "prometheus.yaml").read_text()
+    )
+    assert "prometheus:9090" in ds["datasources"][0]["url"]
+    dash = yaml.safe_load(
+        (DEPLOY / "grafana" / "provisioning" / "dashboards" / "dashboards.yaml").read_text()
+    )
+    assert dash["providers"][0]["options"]["path"] == "/var/lib/grafana/dashboards"

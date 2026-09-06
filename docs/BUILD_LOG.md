@@ -433,6 +433,14 @@
 ### How to verify
 - `pytest tests/test_bulk_api.py` green (6 passed).
 
+## T09 — Observability in compose (2026-09-06)
+### What was done
+- `docker-compose.yml`: `prometheus` (config + `alerts.yml` mounted, `:9090`) and `grafana` (datasource + dashboard provisioning, `:3000`) services with persistent volumes.
+- New `deploy/prometheus/prometheus.yml` (scrapes host API `/metrics` + self), Grafana datasource/dashboard provisioning YAMLs pointing at the existing 9-panel `dashboard.json`.
+- `tests/test_observability.py`: +3 tests (compose wiring, scrape config, provisioning).
+### How to verify
+- `docker compose up -d prometheus grafana` → both `/-/healthy` + `/api/health` 200; `pytest tests/test_observability.py` green (9 passed).
+
 
 
 
