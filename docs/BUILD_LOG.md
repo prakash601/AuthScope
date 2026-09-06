@@ -461,6 +461,14 @@
 ### How to verify
 - `pytest tests/test_browser_integration.py tests/test_aggregator.py tests/test_worker_scans.py` green.
 
+## T12 — Diff at scale (2026-09-06)
+### What was done
+- Verified the diff path is already scale-safe: indexed `LIMIT 1` prior-scan lookup + snapshot build over 2 scans only (no history fan-out); 120-row perf test green (~ms vs the 5s bound).
+- Added composite index `ix_scans_user_url_created (user_id, normalized_url, created_at)` matching the `GET /diff` filter/order exactly (migration `7a1b2c3d4e5f`, model `Scan.__table_args__`); upgrade/downgrade round-trip verified against live Postgres.
+- Decision: Postgres carries history for now — no Timescale/ClickHouse until a URL exceeds ~10k scans or diff p95 breaches 1s (both observable via existing metrics). The diff query shape stays store-agnostic (`Snapshot` projection).
+### How to verify
+- `alembic upgrade head` shows the index; `pytest tests/test_diff.py tests/test_models_roundtrip.py` green.
+
 
 
 
