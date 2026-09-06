@@ -47,4 +47,10 @@ Signatures live in Git (`signatures/*.yaml`). PR → merge → run
 
 ## Compliance notes
 - Robots.txt respect is a policy flag: `SCAN_RESPECT_ROBOTS_TXT=true` (default off).
+  The check fetches `robots.txt` through the scan's browser context, so it honors
+  the assigned proxy/country like any other navigation.
 - All reports carry the detection-only disclaimer; AuthScope never bypasses protections.
+
+## Logs
+API emits one JSON `http_access` line per request (request_id, method, route,
+status, duration_ms) to stdout — point any shipper (Fluent Bit/Vector → Elasticsearch/Loki) at container logs; no dedicated log infra in compose by design.

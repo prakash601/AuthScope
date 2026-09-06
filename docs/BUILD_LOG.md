@@ -476,6 +476,13 @@
 ### How to verify
 - `node --check dashboard/app.js`; `pytest tests/test_dashboard_and_policy.py` green (5 passed); manual: report → Load HAR entries → filter + expand.
 
+## T14 — Logs + compliance polish (2026-09-06)
+### What was done
+- Logs: one JSON `http_access` access line per request (request_id/method/route/status/duration_ms) — searchable by any stdout shipper; documented in `RUNBOOK.md` (no new infra by design, ES/Loki deferred).
+- Robots: `robots.txt` now fetched through the scan's browser context request API (proxy/country honored), urllib kept as fallback; fail-open on unreadable.
+### How to verify
+- `pytest tests/test_observability.py tests/test_dashboard_and_policy.py` green (16 passed).
+
 
 
 

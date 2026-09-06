@@ -151,3 +151,24 @@ def test_grafana_provisioning_valid():
         (DEPLOY / "grafana" / "provisioning" / "dashboards" / "dashboards.yaml").read_text()
     )
     assert dash["providers"][0]["options"]["path"] == "/var/lib/grafana/dashboards"
+
+
+async def test_http_access_log_is_json(app_client, user_and_key, caplog):
+    """T14: one JSON access line per request (log-shipper searchable)."""
+    import json
+    import logging
+
+    _, client = app_client
+    with caplog.at_level(logging.INFO, logger="authscope.api"):
+        resp = await client.get("/v1/scans", headers=user_and_key["headers"])
+    assert resp.status_code == 200
+    events = []
+    for rec in caplog.records:
+        try:
+            events.append(json.loads(rec.getMessage()))
+        except (json.JSONDecodeError, TypeError):
+            continue
+    access = [e for e in events if e.get("event") == "http_access"]
+    assert access
+    assert access[-1]["status"] == 200
+    assert access[-1]["request_id"] and access[-1]["duration_ms"] is not None

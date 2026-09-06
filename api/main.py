@@ -60,11 +60,12 @@ def create_app(settings=None) -> FastAPI:
 
     dashboard_dir = _Path(__file__).parent.parent / "dashboard"
     if dashboard_dir.exists():
-        app.mount("/dashboard", StaticFiles(directory=dashboard_dir, html=True),
-                  name="dashboard")
+        app.mount("/dashboard", StaticFiles(directory=dashboard_dir, html=True), name="dashboard")
 
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
+        import json as _json
+
         from telemetry import observe_http
 
         request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:16])
@@ -72,7 +73,22 @@ def create_app(settings=None) -> FastAPI:
         start = time.time()
         response = await call_next(request)
         route = getattr(request.scope.get("route"), "path", request.url.path)
+        duration_ms = int((time.time() - start) * 1000)
         observe_http(start, request.method, route, response.status_code)
+        # Single JSON access line (stdout): searchable by any log shipper
+        # (Elasticsearch/Loki) without new infrastructure.
+        logger.info(
+            _json.dumps(
+                {
+                    "event": "http_access",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "route": route,
+                    "status": response.status_code,
+                    "duration_ms": duration_ms,
+                }
+            )
+        )
         response.headers["X-Request-ID"] = request_id
         return response
 
@@ -95,8 +111,7 @@ def create_app(settings=None) -> FastAPI:
         logger.exception("unhandled error on %s", request.url.path)
         return JSONResponse(
             status_code=500,
-            content={"detail": {"code": "internal_error",
-                                "message": "unexpected server error"}},
+            content={"detail": {"code": "internal_error", "message": "unexpected server error"}},
         )
 
     @app.get("/healthz", tags=["health"])

@@ -135,8 +135,13 @@ class PageController:
             else (settings_lazy or 0)
         )
 
-    async def _robots_disallows(self, url: str) -> bool:
-        """Check robots.txt when the org-policy flag is enabled."""
+    async def _robots_disallows(self, url: str, context=None) -> bool:
+        """Check robots.txt when the org-policy flag is enabled.
+
+        Fetches through the scan's browser context (proxy/country honored);
+        falls back to a direct fetch only if the context path fails.
+        Unreadable robots.txt = allowed (fail-open).
+        """
         from config import get_settings
 
         try:
@@ -145,17 +150,25 @@ class PageController:
             return False
         if not settings.scan.respect_robots_txt:
             return False
-        import urllib.request
         from urllib.parse import urlsplit
         from urllib.robotparser import RobotFileParser
 
         parts = urlsplit(url)
         robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
-        try:
-            with urllib.request.urlopen(robots_url, timeout=5) as resp:
-                body = resp.read().decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001 — no/unreadable robots.txt = allowed
-            return False
+        body: str | None = None
+        if context is not None:
+            with contextlib.suppress(Exception):
+                resp = await context.request.get(robots_url, timeout=5000)
+                if resp.ok:
+                    body = await resp.text()
+        if body is None:
+            import urllib.request
+
+            try:
+                with urllib.request.urlopen(robots_url, timeout=5) as resp:
+                    body = resp.read().decode("utf-8", errors="replace")
+            except Exception:  # noqa: BLE001 — no/unreadable robots.txt = allowed
+                return False
         parser = RobotFileParser()
         parser.parse(body.splitlines())
         ua = "*"
@@ -241,7 +254,7 @@ class PageController:
         goto_error: str | None = None
 
         # Optional robots.txt compliance (org policy flag, off by default).
-        if await self._robots_disallows(url):
+        if await self._robots_disallows(url, context):
             logger.info("robots.txt disallows %s — skipping navigation", url)
             artifact = PageArtifact(
                 url=url,

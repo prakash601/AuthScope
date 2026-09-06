@@ -39,11 +39,13 @@ async def test_report_includes_disclaimer(app_client, user_and_key):
     app, client = app_client
     sid = str(uuid.uuid4())
     async with app.state.session_factory() as session, session.begin():
-        await session.execute(sa.text(
-            "INSERT INTO scans (id, user_id, url, normalized_url, status,"
-            " created_at, options) VALUES (:i, :u, 'https://d.example/l',"
-            " 'https://d.example/l', 'completed', now(), '{}')"
-        ).bindparams(i=uuid.UUID(sid), u=uuid.UUID(user_and_key["user_id"])))
+        await session.execute(
+            sa.text(
+                "INSERT INTO scans (id, user_id, url, normalized_url, status,"
+                " created_at, options) VALUES (:i, :u, 'https://d.example/l',"
+                " 'https://d.example/l', 'completed', now(), '{}')"
+            ).bindparams(i=uuid.UUID(sid), u=uuid.UUID(user_and_key["user_id"]))
+        )
     resp = await client.get(f"/v1/scans/{sid}", headers=user_and_key["headers"])
     body = resp.json()
     assert body.get("disclaimer") is not None
@@ -79,9 +81,44 @@ async def test_robots_txt_disallow_honoured():
     from urllib.robotparser import RobotFileParser
 
     parser = RobotFileParser()
-    parser.parse([
-        "User-agent: *",
-        "Disallow: /private/",
-    ])
+    parser.parse(
+        [
+            "User-agent: *",
+            "Disallow: /private/",
+        ]
+    )
     assert parser.can_fetch("*", "https://x.test/public/page") is True
     assert parser.can_fetch("*", "https://x.test/private/login") is False
+
+
+async def test_robots_txt_fetched_through_scan_context():
+    """Robots body comes from the scan context (proxy-honoring path)."""
+    from config import get_settings
+    from engine.page.controller import PageController
+
+    settings = get_settings()
+    original = settings.scan.respect_robots_txt
+    settings.scan.respect_robots_txt = True
+    try:
+
+        class _Resp:
+            ok = True
+
+            async def text(self):
+                return "User-agent: *\nDisallow: /private/\n"
+
+        class _APIRequest:
+            async def get(self, url, timeout=None):
+                assert url == "https://x.test/robots.txt"
+                return _Resp()
+
+        class _Context:
+            request = _APIRequest()
+
+        controller = PageController(lazy_captcha_wait_seconds=0)
+        assert (
+            await controller._robots_disallows("https://x.test/private/login", _Context()) is True
+        )
+        assert await controller._robots_disallows("https://x.test/public/page", _Context()) is False
+    finally:
+        settings.scan.respect_robots_txt = original
