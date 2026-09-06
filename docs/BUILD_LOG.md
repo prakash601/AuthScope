@@ -386,6 +386,14 @@
 ### How to verify
 - `git status --short` shows no `?? website/`; `ruff check` clean; `ls LICENSE` present.
 
+## T03 — Green local stack verification (2026-09-06)
+### What was done
+- `docker compose up -d --wait` healthy (postgres, redis, minio + bucket init); `alembic upgrade head`, `db.seed` (dev-key), `db.load_signatures` (74 sigs) all succeed.
+- `ruff check` clean, `mypy` clean across 47 source files.
+- Full suite: **131 passed** (130 + T01 Arkose regression) in ~65s; coverage **90.36%** (gate 70%).
+### How to verify
+- Re-run: `make compose-up && make db-upgrade && .venv/bin/python -m db.seed && make signatures-load && make test`.
+
 
 
 
