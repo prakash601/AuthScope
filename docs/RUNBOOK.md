@@ -4,7 +4,7 @@
 1. Build & push images: `docker build -f Dockerfile.api -t <registry>/authscope/api:<tag> .`
    and `docker build -f Dockerfile.worker -t <registry>/authscope/worker:<tag> .`
 2. Create/update secrets (`deploy/k8s/config-and-secrets.example.yaml` is a **template** —
-   provision real secrets via `kubectl create secret` or your secret manager).
+   see `deploy/k8s/SECRETS.md` for provision/rotation commands; never commit real values).
 3. Apply migrations Job: `kubectl apply -f deploy/k8s/migrations-job.yaml`.
 4. Roll API + workers: `kubectl apply -f deploy/k8s/api.yaml deploy/k8s/worker.yaml`.
 5. Verify: `/healthz` on the API service; Grafana dashboard `authscope-overview`.

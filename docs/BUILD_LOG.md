@@ -402,6 +402,15 @@
 ### How to verify
 - `make demo` → `demo: all PASS` (3/3).
 
+## T05 — Secrets via manager (2026-09-06)
+### What was done
+- Audited: no hardcoded secrets outside tests/docs (git grep clean), Dockerfiles bake no secret `ENV`, template holds 4 `replace-me` placeholders, `.env` untracked.
+- Added `deploy/k8s/SECRETS.md`: provision (`kubectl create secret generic`), manager-operator pattern, fail-fast validation, rotation steps.
+- Added `tests/test_deploy_policy.py` (4 tests): template placeholders, no baked image secrets, `secretRef`+`configMapRef` on api/worker/migrations, `.env` gitignored.
+- `docs/RUNBOOK.md` deploy step points at `SECRETS.md`.
+### How to verify
+- `pytest tests/test_deploy_policy.py` green (no infra needed).
+
 
 
 
