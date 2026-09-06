@@ -441,6 +441,18 @@
 ### How to verify
 - `docker compose up -d prometheus grafana` → both `/-/healthy` + `/api/health` 200; `pytest tests/test_observability.py` green (9 passed).
 
+## T10 — Concurrency soak (2026-09-06)
+### What was done
+- `scripts/loadtest.py`: added `--poll-timeout` (default 120s) and an `incomplete` counter — the old fixed 120-poll window silently truncated slow lifecycle latencies.
+- Validation on this machine (API + Celery concurrency=4 + offline fixture target):
+  - 50 concurrent submissions: `requests=50 errors=0`, throughput ~0.2/s sustained, no OOM/queue starvation (queue drained to zero after).
+  - 10-scan completion run (`--poll-timeout 400`): `10/10 completed, errors=0 incomplete=0, p50=17.6s p95=25.1s` — in line with the M4 baseline (p50 16.0s / p95 17.4s).
+  - Soak scans in DB: all `completed`, 0 `failed` (8 `waf_blocked` rows are pre-existing `/blocked/cloudflare` test data).
+- Incidents during the run (honest notes): Docker Desktop restarted mid-soak (all containers `Exited (0)`), and a stale worker stopped consuming (fixed by restart; `celery inspect` showed no node). Both are local-env flakiness, not app faults — queue + DB volumes persisted and the backlog drained after restart.
+- K8s HPA behavior (min 3 / max 20 on 70% memory) still needs staging validation — cannot be proven on one laptop.
+### How to verify
+- Re-run: start API/worker/fixture, `scripts/loadtest.py --key <high-limit-key> --target <fixture> --total 10 --concurrency 10 --poll-timeout 400`.
+
 
 
 
