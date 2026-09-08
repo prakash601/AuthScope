@@ -76,6 +76,7 @@ async function loadList() {
   const p = new URLSearchParams();
   if ($("f-provider").value) p.set("provider", $("f-provider").value);
   if ($("f-captcha").value) p.set("captcha_type", $("f-captcha").value);
+  if ($("f-waf").value) p.set("waf_provider", $("f-waf").value);
   if ($("f-min-diff").value) p.set("min_difficulty", $("f-min-diff").value);
   if ($("f-status").value) p.set("status", $("f-status").value);
   p.set("limit", "100");
@@ -135,6 +136,55 @@ async function loadReport(id) {
     art.dom_snapshot_url ? `<a href="${art.dom_snapshot_url}" target="_blank">DOM snapshot</a>` : "",
   ].filter(Boolean).join(" · ");
   $("report-raw").textContent = JSON.stringify(body, null, 2).slice(0, 20000);
+  state.harUrl = art.har_url || null;
+  $("har-summary").textContent = art.har_url ? "" : "no HAR captured";
+  $("har-table tbody").innerHTML = "";
+  state.harEntries = null;
+}
+
+// HAR explorer: fetch-on-demand navigable entries table (URLs are page-controlled → escape).
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+$("btn-har").onclick = async () => {
+  const tbody = $("har-table tbody");
+  if (!state.harUrl) { $("har-summary").textContent = "no HAR captured"; return; }
+  $("har-summary").textContent = "loading...";
+  try {
+    const r = await fetch(state.harUrl, { headers: headers() });
+    const har = await r.json();
+    state.harEntries = (har.log && har.log.entries) || [];
+    $("har-summary").textContent = `${state.harEntries.length} entries`;
+    renderHar("");
+  } catch (e) { $("har-summary").textContent = `error: ${e.message}`; }
+};
+
+$("har-filter").oninput = (e) => renderHar(e.target.value.trim().toLowerCase());
+
+function renderHar(filter) {
+  const tbody = $("har-table tbody");
+  tbody.innerHTML = "";
+  for (const e of (state.harEntries || []).slice(0, 500)) {
+    const url = (e.request && e.request.url) || "";
+    if (filter && !url.toLowerCase().includes(filter)) continue;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="mono">${esc(e.request?.method)}</td>
+      <td class="mono" title="${esc(url)}">${esc(url.slice(0, 120))}</td>
+      <td class="mono">${esc(e.response?.status)}</td>
+      <td class="mono">${esc(e.time)}</td>`;
+    tr.onclick = () => {
+      const detail = tr.nextSibling?._harDetail ? tr.nextSibling : null;
+      if (detail) { detail.remove(); return; }
+      const d = document.createElement("tr");
+      d._harDetail = true;
+      const hdrs = (e.request?.headers || []).map((h) => `${h.name}: ${h.value}`).join("\n");
+      d.innerHTML = `<td colspan="4"><pre class="mono">${esc(hdrs.slice(0, 2000))}</pre></td>`;
+      tr.after(d);
+    };
+    tbody.appendChild(tr);
+  }
 }
 
 function sectionTable(title, rows) {

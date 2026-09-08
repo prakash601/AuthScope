@@ -75,6 +75,8 @@ class Scan(Base):
     __table_args__ = (
         Index("ix_scans_url_created", "normalized_url", "created_at"),
         Index("ix_scans_status", "status"),
+        # Diff/history lookup: owner + URL + time window/order (GET /diff).
+        Index("ix_scans_user_url_created", "user_id", "normalized_url", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()

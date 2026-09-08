@@ -368,6 +368,130 @@
 - Live load validation through real Celery + Chromium completed with zero errors.
 - All milestones (M0–M4) complete: detection engine, API platform, scoring, diffing, feedback loop, observability, dashboard, and deployment packaging.
 
+## T01 — Detector correctness: Arkose key + real HAR timings (2026-09-06)
+### What was done
+- `engine/detectors/captcha.py`: renamed widget-marker key `arkose_funcaptcha` → `arkose_funaptcha` to match `signatures/captcha.yaml`, so Arkose widget pages report `visible=true` / `challenge_visible`.
+- `engine/artifacts.py`: added `CapturedRequest.started_at` + `duration_ms` (optional, backward-compatible).
+- `engine/page/controller.py`: `on_request` stamps wall time, `on_response` computes duration, `build_har(entries, url, scan_started_at)` emits real ISO-8601 `startedDateTime` and `time`/`timings.wait`; page `startedDateTime` uses scan start. No more `1970-01-01` stub or `time: -1`.
+- `tests/test_detectors.py`: added `test_arkose_funaptcha_visible_vs_script_only` regression test.
+### How to verify
+- `.venv/bin/python -m pytest tests/test_detectors.py tests/test_browser_integration.py::test_har_valid_json_and_screenshot -q` green; ruff + mypy clean.
+- Manual: `build_har` output contains no `1970`, entry `time` equals measured duration.
+
+## T02 — Repo hygiene: website tracked + license settled (2026-09-06)
+### What was done
+- Tracked `website/index.html` + `website/styles.css` (were untracked); `git status` now clean apart from venv/cache (all ignored).
+- Added `LICENSE` (proprietary, matches `pyproject.toml` + website footer); `README.md` License section points at it instead of `TBD`.
+- `README.md` Getting Started now uses `.venv/bin/python -m db.seed` and `make signatures-load` to match the Makefile exactly.
+### How to verify
+- `git status --short` shows no `?? website/`; `ruff check` clean; `ls LICENSE` present.
+
+## T03 — Green local stack verification (2026-09-06)
+### What was done
+- `docker compose up -d --wait` healthy (postgres, redis, minio + bucket init); `alembic upgrade head`, `db.seed` (dev-key), `db.load_signatures` (74 sigs) all succeed.
+- `ruff check` clean, `mypy` clean across 47 source files.
+- Full suite: **131 passed** (130 + T01 Arkose regression) in ~65s; coverage **90.36%** (gate 70%).
+### How to verify
+- Re-run: `make compose-up && make db-upgrade && .venv/bin/python -m db.seed && make signatures-load && make test`.
+
+## T04 — Canned demo pack (2026-09-06)
+### What was done
+- `scripts/demo.py`: offline 3-target showcase (auth0 / turnstile-visible / waf-cookies) through real Chromium + all 5 detectors + aggregate/score; exits non-zero on mismatch. Run via `make demo`.
+- `docs/DEMO.md`: walkthrough — offline demo table, full API curl flow, dashboard path, evidence notes.
+- `Makefile`: `demo` target; `.gitignore`: ignore `.coverage*`/`htmlcov/`.
+### How to verify
+- `make demo` → `demo: all PASS` (3/3).
+
+## T05 — Secrets via manager (2026-09-06)
+### What was done
+- Audited: no hardcoded secrets outside tests/docs (git grep clean), Dockerfiles bake no secret `ENV`, template holds 4 `replace-me` placeholders, `.env` untracked.
+- Added `deploy/k8s/SECRETS.md`: provision (`kubectl create secret generic`), manager-operator pattern, fail-fast validation, rotation steps.
+- Added `tests/test_deploy_policy.py` (4 tests): template placeholders, no baked image secrets, `secretRef`+`configMapRef` on api/worker/migrations, `.env` gitignored.
+- `docs/RUNBOOK.md` deploy step points at `SECRETS.md`.
+### How to verify
+- `pytest tests/test_deploy_policy.py` green (no infra needed).
+
+## T06 — Production-ready proxy pool (2026-09-06)
+### What was done
+- `workers/proxy.py`: pool URLs validated at load (scheme allowlist, JSON shape — fail fast); unknown requested country falls back to random with warning; per-country usage counters + redacted-host acquire logs; credentials never logged (`redact_proxy_url`); docstring documents provider plug-in + secret-store sourcing.
+- `tests/test_proxy_pool.py` (8 tests): direct-mode, rejection paths, fallback, retry, redaction, usage counts.
+### How to verify
+- `pytest tests/test_proxy_pool.py tests/test_worker_scans.py` green (13 passed).
+
+## T07 — Webhook DLQ re-drive API (2026-09-06)
+### What was done
+- `workers/webhooks.py`: DLQ entries carry `dlq_id` + `user_id`; added `list_dlq`/`remove_dlq_entry`; `dispatch_report` tags entries with the scan owner's id.
+- `api/routes/webhooks.py`: `GET /v1/webhooks/dlq` (owner-scoped list), `POST /v1/webhooks/dlq/{id}/redrive` (looks up active webhook secret, rebuilds report from DB, re-delivers signed, drops entry on success; 404/409/502 otherwise).
+- `README.md` endpoint table + webhook section document the DLQ flow.
+### How to verify
+- `pytest tests/test_webhooks.py` green (6 passed: signing, retry, DLQ, CRUD, list+redrive, unknown-id).
+
+## T08 — Bulk batch progress endpoint (2026-09-06)
+### What was done
+- `api/routes/scans.py`: `GET /v1/scans/bulk/{batch_id}` aggregates owner-scoped scans by `options.batch_id` (JSONB) into `{total, by_status{queued,running,completed,failed,waf_blocked}}`; 404 for unknown/other-owner batches.
+- `README.md` bulk section documents the progress endpoint.
+### How to verify
+- `pytest tests/test_bulk_api.py` green (6 passed).
+
+## T09 — Observability in compose (2026-09-06)
+### What was done
+- `docker-compose.yml`: `prometheus` (config + `alerts.yml` mounted, `:9090`) and `grafana` (datasource + dashboard provisioning, `:3000`) services with persistent volumes.
+- New `deploy/prometheus/prometheus.yml` (scrapes host API `/metrics` + self), Grafana datasource/dashboard provisioning YAMLs pointing at the existing 9-panel `dashboard.json`.
+- `tests/test_observability.py`: +3 tests (compose wiring, scrape config, provisioning).
+### How to verify
+- `docker compose up -d prometheus grafana` → both `/-/healthy` + `/api/health` 200; `pytest tests/test_observability.py` green (9 passed).
+
+## T10 — Concurrency soak (2026-09-06)
+### What was done
+- `scripts/loadtest.py`: added `--poll-timeout` (default 120s) and an `incomplete` counter — the old fixed 120-poll window silently truncated slow lifecycle latencies.
+- Validation on this machine (API + Celery concurrency=4 + offline fixture target):
+  - 50 concurrent submissions: `requests=50 errors=0`, throughput ~0.2/s sustained, no OOM/queue starvation (queue drained to zero after).
+  - 10-scan completion run (`--poll-timeout 400`): `10/10 completed, errors=0 incomplete=0, p50=17.6s p95=25.1s` — in line with the M4 baseline (p50 16.0s / p95 17.4s).
+  - Soak scans in DB: all `completed`, 0 `failed` (8 `waf_blocked` rows are pre-existing `/blocked/cloudflare` test data).
+- Incidents during the run (honest notes): Docker Desktop restarted mid-soak (all containers `Exited (0)`), and a stale worker stopped consuming (fixed by restart; `celery inspect` showed no node). Both are local-env flakiness, not app faults — queue + DB volumes persisted and the backlog drained after restart.
+- K8s HPA behavior (min 3 / max 20 on 70% memory) still needs staging validation — cannot be proven on one laptop.
+### How to verify
+- Re-run: start API/worker/fixture, `scripts/loadtest.py --key <high-limit-key> --target <fixture> --total 10 --concurrency 10 --poll-timeout 400`.
+
+## T11 — Engine completeness (2026-09-06)
+### What was done
+- Response bodies: `CapturedRequest.response_body` (+truncated flag, 64KB cap, text-ish only) captured when `deep_scan=true`; wired the previously dead API `deep_scan` option through `workers/tasks.py` → `PageController.run`.
+- Hooks: `HOOKS_JS` now wraps `WebSocket` + `EventSource` (kind `ws`/`sse` in hook log); new `ws_page.html` / `sse_page.html` fixtures + browser tests.
+- Schema guard: `test_committed_schema_matches_model` fails CI on `ScanReport` drift (regen via `ScanReport.model_json_schema()`; hand-set `$id`/title normalized).
+### How to verify
+- `pytest tests/test_browser_integration.py tests/test_aggregator.py tests/test_worker_scans.py` green.
+
+## T12 — Diff at scale (2026-09-06)
+### What was done
+- Verified the diff path is already scale-safe: indexed `LIMIT 1` prior-scan lookup + snapshot build over 2 scans only (no history fan-out); 120-row perf test green (~ms vs the 5s bound).
+- Added composite index `ix_scans_user_url_created (user_id, normalized_url, created_at)` matching the `GET /diff` filter/order exactly (migration `7a1b2c3d4e5f`, model `Scan.__table_args__`); upgrade/downgrade round-trip verified against live Postgres.
+- Decision: Postgres carries history for now — no Timescale/ClickHouse until a URL exceeds ~10k scans or diff p95 breaches 1s (both observable via existing metrics). The diff query shape stays store-agnostic (`Snapshot` projection).
+### How to verify
+- `alembic upgrade head` shows the index; `pytest tests/test_diff.py tests/test_models_roundtrip.py` green.
+
+## T13 — Dashboard evidence viewer (2026-09-06)
+### What was done
+- `dashboard/index.html` + `app.js`: fetch-on-demand HAR explorer (entry count, URL-substring filter, 500-row cap, click-to-expand request headers with HTML-escaping for page-controlled URLs) + WAF provider list filter (full parity with `GET /v1/scans` filters). Screenshot thumbnail + artifact links unchanged.
+- `tests/test_dashboard_and_policy.py`: static assertions for the explorer block, WAF input, and JS wiring.
+### How to verify
+- `node --check dashboard/app.js`; `pytest tests/test_dashboard_and_policy.py` green (5 passed); manual: report → Load HAR entries → filter + expand.
+
+## T14 — Logs + compliance polish (2026-09-06)
+### What was done
+- Logs: one JSON `http_access` access line per request (request_id/method/route/status/duration_ms) — searchable by any stdout shipper; documented in `RUNBOOK.md` (no new infra by design, ES/Loki deferred).
+- Robots: `robots.txt` now fetched through the scan's browser context request API (proxy/country honored), urllib kept as fallback; fail-open on unreadable.
+### How to verify
+- `pytest tests/test_observability.py tests/test_dashboard_and_policy.py` green (16 passed).
+
+## T15 — CI repair: MinIO images + NoSuchBucket hardening (2026-09-07)
+### What was done
+- CI failed on `bitnami/minio:latest` (image removed upstream) — MinIO now runs via `docker run minio/minio:latest server /data` with a health gate; `minio/mc` for bucket bootstrap; bucket existence verified with `mc stat` (fail fast).
+- Real defect the outage exposed: `upload_evidence` hard-required a pre-provisioned bucket. Added idempotent `ensure_bucket` (head → create on 404) called on every upload.
+- Same incident exposed scans stuck `running` forever on mid-pipeline crashes: `_run_scan` now marks `failed` + truncated `error_detail` (best-effort) and re-raises.
+- Test bug: eager fixture set bogus `task_propagates` (real setting is `task_eager_propagates`) — failures were swallowed in tests, hiding the above. Fixed + added `test_unexpected_failure_marks_scan_failed`.
+### How to verify
+- `pytest tests/test_worker_scans.py tests/test_evidence_service.py` green; full suite 158 passed.
+
 
 
 

@@ -21,8 +21,11 @@ def eager_celery():
     """Run Celery tasks inline for tests."""
     from workers.celery_app import celery_app
 
-    celery_app.conf.update(task_always_eager=True, task_store_eager_result=True,
-                           task_propagates=True)
+    celery_app.conf.update(
+        task_always_eager=True,
+        task_store_eager_result=True,
+        task_eager_propagates=True,
+    )
     yield celery_app
     celery_app.conf.task_always_eager = False
 
@@ -41,8 +44,9 @@ async def _get_scan(app, scan_id: str):
 async def test_run_scan_completes_end_to_end(app_client, user_and_key, eager_celery):
     """POST /v1/scans -> eager worker -> full report retrievable."""
     _, client = app_client
-    resp = await client.post("/v1/scans", json={"url": fx("auth0_like.html")},
-                             headers=user_and_key["headers"])
+    resp = await client.post(
+        "/v1/scans", json={"url": fx("auth0_like.html")}, headers=user_and_key["headers"]
+    )
     assert resp.status_code == 202
     scan_id = resp.json()["scan_id"]
 
@@ -55,9 +59,7 @@ async def test_run_scan_completes_end_to_end(app_client, user_and_key, eager_cel
     assert body["antibot"]["difficulty_score"] is not None
 
 
-async def test_blocked_first_attempt_retries_then_completes(
-    app_client, user_and_key, eager_celery
-):
+async def test_blocked_first_attempt_retries_then_completes(app_client, user_and_key, eager_celery):
     """403 challenge on first navigation -> retry succeeds -> completed."""
     _, client = app_client
     resp = await client.post(
@@ -74,9 +76,11 @@ async def test_blocked_first_attempt_retries_then_completes(
 
 async def test_persistent_block_ends_waf_blocked(app_client, user_and_key, eager_celery):
     _, client = app_client
-    resp = await client.post("/v1/scans",
-                             json={"url": fx("blocked/cloudflare"), "options": {"force": True}},
-                             headers=user_and_key["headers"])
+    resp = await client.post(
+        "/v1/scans",
+        json={"url": fx("blocked/cloudflare"), "options": {"force": True}},
+        headers=user_and_key["headers"],
+    )
     scan_id = resp.json()["scan_id"]
 
     scan = await _get_scan(app_client[0], scan_id)
@@ -104,3 +108,27 @@ async def test_completed_scan_is_cached(app_client, user_and_key, eager_celery):
     r2 = await client.post("/v1/scans", json={"url": url}, headers=user_and_key["headers"])
     body2 = r2.json()
     assert body2.get("cached") is True and body2["scan_id"] == id1
+
+
+async def test_unexpected_failure_marks_scan_failed(
+    app_client, user_and_key, eager_celery, monkeypatch
+):
+    """A mid-pipeline crash marks the scan failed (never stuck running)."""
+    import pipeline.evidence
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated upload outage")
+
+    monkeypatch.setattr(pipeline.evidence, "upload_evidence", _boom)
+    _, client = app_client
+    # Starlette sends a 500 but the test transport re-raises app exceptions.
+    with pytest.raises(RuntimeError, match="simulated upload outage"):
+        await client.post(
+            "/v1/scans", json={"url": fx("index.html")}, headers=user_and_key["headers"]
+        )
+    listing = await client.get("/v1/scans?status=failed", headers=user_and_key["headers"])
+    assert listing.json()["total"] >= 1
+    item = listing.json()["items"][0]
+    assert item["status"] == "failed"
+    row = await _get_scan(app_client[0], item["scan_id"])
+    assert row.error_detail and "simulated upload outage" in row.error_detail

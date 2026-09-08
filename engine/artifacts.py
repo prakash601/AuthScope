@@ -33,6 +33,10 @@ class CapturedRequest(BaseModel):
     request_headers: dict[str, str] = Field(default_factory=dict)
     response_headers: dict[str, str] = Field(default_factory=dict)
     is_xhr_fetch: bool = False
+    started_at: float | None = None
+    duration_ms: int | None = None
+    response_body: str | None = None
+    response_body_truncated: bool = False
 
 
 class CookieInfo(BaseModel):

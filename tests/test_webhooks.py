@@ -27,8 +27,7 @@ class _Receiver(BaseHTTPRequestHandler):
         with self.server.lock:
             self.server.hits[self.path] = self.server.hits.get(self.path, 0) + 1
             hits = self.server.hits[self.path]
-            self.server.bodies.append((self.path, body,
-                                       dict(self.headers)))
+            self.server.bodies.append((self.path, body, dict(self.headers)))
         fail_times = self.server.fail_first.get(self.path, 0)
         if hits <= fail_times:
             self.send_response(500)
@@ -68,8 +67,7 @@ def receiver():
 
 async def test_delivery_signed_and_verified(receiver):
     secret = "s3cret"
-    ok, err = await deliver(f"http://127.0.0.1:8932/ok-{uuid4hex()}", secret,
-                            {"hello": "world"})
+    ok, err = await deliver(f"http://127.0.0.1:8932/ok-{uuid4hex()}", secret, {"hello": "world"})
     assert ok and err == ""
     path, body, headers = receiver.bodies[-1]
     sig = headers.get(SIGNATURE_HEADER)
@@ -95,8 +93,7 @@ async def test_persistent_failure_dead_letters(app_client, receiver):
     redis = app.state.redis
     await redis.delete(DLQ_KEY)
     url = "http://127.0.0.1:8932/always-fails"
-    statuses = await dispatch_report(redis, [(url, "secret")],
-                                     {"report": True}, "scan-1")
+    statuses = await dispatch_report(redis, [(url, "secret")], {"report": True}, "scan-1")
     assert statuses[url].startswith("failed:")
     assert receiver.hits["/always-fails"] >= 3  # retried with backoff
 
@@ -110,8 +107,9 @@ async def test_webhook_crud_endpoints(app_client, user_and_key):
     _, client = app_client
     headers = user_and_key["headers"]
 
-    created = await client.post("/v1/webhooks", json={"url": "https://hooks.example/x"},
-                                headers=headers)
+    created = await client.post(
+        "/v1/webhooks", json={"url": "https://hooks.example/x"}, headers=headers
+    )
     assert created.status_code == 201
     body = created.json()
     wid = body["id"]
@@ -130,3 +128,57 @@ async def test_webhook_crud_endpoints(app_client, user_and_key):
         f"/v1/webhooks/{uuid4hex()}", headers={**headers, "X-API-Key": headers["X-API-Key"]}
     )
     assert other_owner.status_code == 404
+
+
+async def test_dlq_list_and_redrive(app_client, user_and_key, second_user_and_key, receiver):
+    import sqlalchemy as sa
+
+    from workers.webhooks import DLQ_KEY, dead_letter
+
+    app, client = app_client
+    headers, other_headers = user_and_key["headers"], second_user_and_key["headers"]
+    redis = app.state.redis
+    await redis.delete(DLQ_KEY)
+
+    url = f"http://127.0.0.1:8932/redrive-{uuid4hex()}"
+    reg = await client.post("/v1/webhooks", json={"url": url}, headers=headers)
+    assert reg.status_code == 201
+
+    import uuid
+
+    sid = str(uuid.uuid4())
+    async with app.state.session_factory() as session, session.begin():
+        await session.execute(
+            sa.text(
+                "INSERT INTO scans (id, user_id, url, normalized_url, status,"
+                " created_at, completed_at, options) VALUES (:i, :u, 'https://d.example/l',"
+                " 'https://d.example/l', 'completed', now(), now(), '{}')"
+            ).bindparams(i=uuid.UUID(sid), u=uuid.UUID(user_and_key["user_id"]))
+        )
+    dlq_id = await dead_letter(
+        redis,
+        {"url": url, "scan_id": sid, "error": "http_500", "user_id": user_and_key["user_id"]},
+    )
+
+    listing = (await client.get("/v1/webhooks/dlq", headers=headers)).json()
+    assert any(e["dlq_id"] == dlq_id and e["scan_id"] == sid for e in listing)
+    other_listing = (await client.get("/v1/webhooks/dlq", headers=other_headers)).json()
+    assert all(e["dlq_id"] != dlq_id for e in other_listing)
+
+    redriven = await client.post(f"/v1/webhooks/dlq/{dlq_id}/redrive", headers=headers)
+    assert redriven.status_code == 200, redriven.text
+    assert redriven.json()["status"] == "delivered"
+
+    after = (await client.get("/v1/webhooks/dlq", headers=headers)).json()
+    assert all(e["dlq_id"] != dlq_id for e in after)
+
+    again = await client.post(f"/v1/webhooks/dlq/{dlq_id}/redrive", headers=headers)
+    assert again.status_code == 404
+
+
+async def test_redrive_unknown_id_404(app_client, user_and_key):
+    _, client = app_client
+    resp = await client.post(
+        "/v1/webhooks/dlq/does-not-exist/redrive", headers=user_and_key["headers"]
+    )
+    assert resp.status_code == 404

@@ -74,12 +74,19 @@ def test_tie_break_signal_count_then_confidence_then_name():
 
 def test_waf_and_fingerprinting_collected_additively():
     findings = [
-        Finding(kind="waf", name="cloudflare", provider="cloudflare", confidence=0.9,
-                matched_signals=[MatchedSignal(signal_type="cookie", value="__cf_bm")]),
+        Finding(
+            kind="waf",
+            name="cloudflare",
+            provider="cloudflare",
+            confidence=0.9,
+            matched_signals=[MatchedSignal(signal_type="cookie", value="__cf_bm")],
+        ),
         Finding(kind="waf", name="datadome", provider="datadome", confidence=0.85),
         Finding(kind="fingerprinting", name="castle", provider=None, confidence=0.9),
         Finding(
-            kind="captcha", name="recaptcha_v3_score", confidence=0.9,
+            kind="captcha",
+            name="recaptcha_v3_score",
+            confidence=0.9,
             extra={"visible": False, "score_based": True},
         ),
     ]
@@ -100,21 +107,54 @@ def test_report_validates_against_committed_schema():
     findings = [
         auth_finding("auth0", 3, 0.95),
         security_posture(),
-        Finding(kind="captcha", name="turnstile_managed", confidence=0.94,
-                extra={"visible": True, "score_based": False}),
-        Finding(kind="waf", name="cloudflare", provider="cloudflare", confidence=0.9,
-                matched_signals=[MatchedSignal(signal_type="header", value="server: cloudflare")]),
+        Finding(
+            kind="captcha",
+            name="turnstile_managed",
+            confidence=0.94,
+            extra={"visible": True, "score_based": False},
+        ),
+        Finding(
+            kind="waf",
+            name="cloudflare",
+            provider="cloudflare",
+            confidence=0.9,
+            matched_signals=[MatchedSignal(signal_type="header", value="server: cloudflare")],
+        ),
     ]
-    report, _ = aggregate("7b9c0f2a-0000-0000-0000-000000000000",
-                          "https://x.test/login", make_artifact(), findings, STRAT)
+    report, _ = aggregate(
+        "7b9c0f2a-0000-0000-0000-000000000000",
+        "https://x.test/login",
+        make_artifact(),
+        findings,
+        STRAT,
+    )
     jsonschema.validate(report.model_dump(mode="json"), schema)
+
+
+def test_committed_schema_matches_model():
+    """CI drift guard: regen with `ScanReport.model_json_schema()` on change.
+
+    The committed file carries a hand-set `$id` + title; both are ignored here —
+    structure is what must stay in sync.
+    """
+    from pipeline.aggregator import ScanReport
+
+    fresh = ScanReport.model_json_schema()
+    committed = json.loads(SCHEMA_PATH.read_text())
+    committed.pop("$id", None)
+    fresh["title"] = committed.get("title", fresh.get("title"))
+    assert fresh == committed
 
 
 def security_posture() -> Finding:
     return Finding(
-        kind="security", name="posture", confidence=0.95,
+        kind="security",
+        name="posture",
+        confidence=0.95,
         extra={
-            "has_csrf": True, "has_hsts": True, "has_csp": False,
+            "has_csrf": True,
+            "has_hsts": True,
+            "has_csp": False,
             "cookie_flags": {"issues": {}},
             "mfa_detected": False,
             "raw_headers": {"server": "nginx"},
@@ -127,6 +167,7 @@ def security_posture() -> Finding:
 # ---------------------------------------------------------------------------
 # Persistence round-trip against live Postgres + MinIO
 # ---------------------------------------------------------------------------
+
 
 async def _deps_reachable() -> bool:
     try:
@@ -194,9 +235,11 @@ async def test_full_round_trip_db_and_evidence(infra):
         session.add(ApiKey(user_id=user.id, key_hash=uuid.uuid4().hex))
         session.add(
             Scan(
-                id=uuid.UUID(scan_id), user_id=user.id,
+                id=uuid.UUID(scan_id),
+                user_id=user.id,
                 url="https://roundtrip.test/login",
-                normalized_url="https://roundtrip.test/login", status="running",
+                normalized_url="https://roundtrip.test/login",
+                status="running",
             )
         )
 
@@ -204,10 +247,19 @@ async def test_full_round_trip_db_and_evidence(infra):
     findings = [
         auth_finding("auth0", 3, 0.95),
         security_posture(),
-        Finding(kind="captcha", name="turnstile_managed", confidence=0.94,
-                extra={"visible": True, "score_based": False}),
-        Finding(kind="waf", name="cloudflare", provider="cloudflare", confidence=0.9,
-                matched_signals=[MatchedSignal(signal_type="cookie", value="__cf_bm")]),
+        Finding(
+            kind="captcha",
+            name="turnstile_managed",
+            confidence=0.94,
+            extra={"visible": True, "score_based": False},
+        ),
+        Finding(
+            kind="waf",
+            name="cloudflare",
+            provider="cloudflare",
+            confidence=0.9,
+            matched_signals=[MatchedSignal(signal_type="cookie", value="__cf_bm")],
+        ),
     ]
     artifact = make_artifact(blocked=False)
     report, _ = aggregate(scan_id, "https://roundtrip.test/login", artifact, findings, STRAT)
@@ -227,9 +279,7 @@ async def test_full_round_trip_db_and_evidence(infra):
     # read back everything through the DB
     async with infra["factory"]() as session:
         scan = (
-            await session.execute(
-                sa.select(Scan).where(Scan.id == uuid.UUID(scan_id))
-            )
+            await session.execute(sa.select(Scan).where(Scan.id == uuid.UUID(scan_id)))
         ).scalar_one()
         assert scan.status == "completed"
         expected_difficulty = report.antibot.difficulty_score
@@ -279,23 +329,25 @@ async def test_full_round_trip_db_and_evidence(infra):
     async with infra["factory"]() as session:
         async with session.begin():
             await persist_report(session, report)
-        count = (await session.execute(
-            sa.select(sa.func.count()).select_from(AuthFinding).where(
-                AuthFinding.scan_id == uuid.UUID(scan_id))
-        )).scalar_one()
+        count = (
+            await session.execute(
+                sa.select(sa.func.count())
+                .select_from(AuthFinding)
+                .where(AuthFinding.scan_id == uuid.UUID(scan_id))
+            )
+        ).scalar_one()
         assert count == 1
 
     # cleanup evidence + rows
     from pipeline.evidence import parse_s3_uri
+
     for uri in (art.har_url, art.screenshot_url, art.dom_snapshot_url):
         if uri:
             bucket, key = parse_s3_uri(uri)
             client.delete_object(Bucket=bucket, Key=key)
     async with infra["factory"]() as session, session.begin():
         for table in (AuthFinding, SecurityFinding, AntibotFinding, Artifacts):
-            await session.execute(
-                sa.delete(table).where(table.scan_id == uuid.UUID(scan_id))
-            )
+            await session.execute(sa.delete(table).where(table.scan_id == uuid.UUID(scan_id)))
         scan_row = await session.get(Scan, uuid.UUID(scan_id))
         if scan_row is not None:
             user_id = scan_row.user_id

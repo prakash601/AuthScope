@@ -89,10 +89,33 @@ async def test_hook_log_fetch_and_xhr(scan_context, controller):
     assert any("xhr-endpoint" in h.get("url", "") for h in result.artifact.hook_log)
 
 
+async def test_hook_log_websocket_and_eventsource(scan_context, controller):
+    ws_result = await controller.run(scan_context, fx("ws_page.html"))
+    ws_kinds = {h.get("kind") for h in ws_result.artifact.hook_log}
+    assert "ws" in ws_kinds
+    assert any("8931/socket" in h.get("url", "") for h in ws_result.artifact.hook_log)
+
+    sse_result = await controller.run(scan_context, fx("sse_page.html"))
+    sse_kinds = {h.get("kind") for h in sse_result.artifact.hook_log}
+    assert "sse" in sse_kinds
+
+
+async def test_deep_scan_captures_response_bodies(scan_context, controller):
+    from engine.page.controller import PageController
+
+    deep = PageController(lazy_captcha_wait_seconds=0)
+    result = await deep.run(scan_context, fx("index.html"), deep_scan=True)
+    docs = [r for r in result.artifact.requests if r.resource_type == "document"]
+    assert docs and all(r.response_body and "ok" in r.response_body for r in docs)
+
+    shallow = await controller.run(scan_context, fx("index.html"))
+    assert all(r.response_body is None for r in shallow.artifact.requests)
+
+
 async def test_globals_probe_sees_page_objects(scan_context, controller):
-    result = await controller.run(scan_context, fx("recaptcha_v3.html").replace(
-        "http://127.0.0.1", "http://127.0.0.1"
-    ))
+    result = await controller.run(
+        scan_context, fx("recaptcha_v3.html").replace("http://127.0.0.1", "http://127.0.0.1")
+    )
     # grecaptcha won't load externally; just assert the probe returned window keys.
     assert "document" in result.artifact.globals
     assert "location" in result.artifact.globals

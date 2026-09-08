@@ -27,6 +27,32 @@ def make_client():
     )
 
 
+def ensure_bucket(client=None, bucket: str | None = None) -> str:
+    """Create the evidence bucket if missing (idempotent).
+
+    Workers must not hard-depend on out-of-band provisioning: a fresh
+    MinIO/S3 target or a deleted bucket would otherwise fail every scan
+    at upload time with NoSuchBucket.
+    """
+    from botocore.exceptions import ClientError
+
+    c = client or make_client()
+    settings = get_settings().s3
+    name = bucket or settings.bucket
+    try:
+        c.head_bucket(Bucket=name)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        if code not in ("404", "NoSuchBucket", "NotFound"):
+            raise
+        kwargs: dict = {"Bucket": name}
+        if settings.region != "us-east-1":
+            kwargs["CreateBucketConfiguration"] = {"LocationConstraint": settings.region}
+        c.create_bucket(**kwargs)
+        logger.info("created evidence bucket %s", name)
+    return name
+
+
 def upload_evidence(
     scan_id: str,
     har_json: str | None = None,
@@ -37,7 +63,7 @@ def upload_evidence(
 ) -> dict[str, str | None]:
     """Upload available artifacts; returns s3:// URIs (None when input missing)."""
     c = client or make_client()
-    bucket = get_settings().s3.bucket
+    bucket = ensure_bucket(c, get_settings().s3.bucket)
     refs: dict[str, str | None] = {
         "har_url": None,
         "screenshot_url": None,
@@ -52,13 +78,9 @@ def upload_evidence(
     if har_json:
         refs["har_url"] = put(f"scans/{scan_id}/har.json", har_json.encode(), "application/json")
     if screenshot_png:
-        refs["screenshot_url"] = put(
-            f"scans/{scan_id}/page.png", screenshot_png, "image/png"
-        )
+        refs["screenshot_url"] = put(f"scans/{scan_id}/page.png", screenshot_png, "image/png")
     if dom_html:
-        refs["dom_snapshot_url"] = put(
-            f"scans/{scan_id}/dom.html", dom_html.encode(), "text/html"
-        )
+        refs["dom_snapshot_url"] = put(f"scans/{scan_id}/dom.html", dom_html.encode(), "text/html")
     if trace_zip:
         refs["trace_url"] = put(f"scans/{scan_id}/trace.zip", trace_zip, "application/zip")
     n_uploaded = sum(v is not None for v in refs.values())

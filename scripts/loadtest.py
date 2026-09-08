@@ -22,16 +22,23 @@ async def main() -> None:
     parser.add_argument("--target", default="https://example.com/login")
     parser.add_argument("--total", type=int, default=200)
     parser.add_argument("--concurrency", type=int, default=20)
-    parser.add_argument("--rate-limit-bypass", action="store_true",
-                        help="use unique keys? not supported; raise key limit instead")
+    parser.add_argument(
+        "--poll-timeout", type=int, default=120, help="max seconds to poll one scan for completion"
+    )
+    parser.add_argument(
+        "--rate-limit-bypass",
+        action="store_true",
+        help="use unique keys? not supported; raise key limit instead",
+    )
     args = parser.parse_args()
 
     latencies: list[float] = []
     errors = 0
+    incomplete = 0
     semaphore = asyncio.Semaphore(args.concurrency)
 
     async def one(client: httpx.AsyncClient, i: int) -> None:
-        nonlocal errors
+        nonlocal errors, incomplete
         async with semaphore:
             start = time.monotonic()
             try:
@@ -45,13 +52,16 @@ async def main() -> None:
                 else:
                     scan_id = resp.json()["scan_id"]
                     # poll until finished (only meaningful with real workers)
-                    for _ in range(120):
-                        r = await client.get(f"/v1/scans/{scan_id}",
-                                             headers={"X-API-Key": args.key})
+                    for _ in range(args.poll_timeout):
+                        r = await client.get(
+                            f"/v1/scans/{scan_id}", headers={"X-API-Key": args.key}
+                        )
                         status = r.json().get("status")
                         if status not in ("queued", "running"):
                             break
                         await asyncio.sleep(1.0)
+                    else:
+                        incomplete += 1
             except Exception:  # noqa: BLE001
                 errors += 1
             finally:
@@ -70,8 +80,10 @@ async def main() -> None:
     def pct(p: float) -> float:
         return latencies[min(int(p * n), n - 1)]
 
-    print(f"requests={n} errors={errors} wall={wall:.1f}s "
-          f"throughput={n / wall:.1f}/s")
+    print(
+        f"requests={n} errors={errors} incomplete={incomplete} wall={wall:.1f}s "
+        f"throughput={n / wall:.1f}/s"
+    )
     print(f"latency p50={pct(0.5):.2f}s p95={pct(0.95):.2f}s p99={pct(0.99):.2f}s")
 
 

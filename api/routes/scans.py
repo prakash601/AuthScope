@@ -82,12 +82,17 @@ async def create_bulk_scan(
     raw = (await request.body()).decode("utf-8", errors="replace")
     urls = _parse_csv_urls(raw)
     if not urls:
-        raise HTTPException(status_code=400, detail={
-            "code": "empty_bulk", "message": "no URLs found in CSV body"})
+        raise HTTPException(
+            status_code=400, detail={"code": "empty_bulk", "message": "no URLs found in CSV body"}
+        )
     if len(urls) > MAX_BULK_URLS:
-        raise HTTPException(status_code=400, detail={
-            "code": "too_many_urls",
-            "message": f"bulk scans are limited to {MAX_BULK_URLS} URLs per batch"})
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "too_many_urls",
+                "message": f"bulk scans are limited to {MAX_BULK_URLS} URLs per batch",
+            },
+        )
 
     session_factory = request.app.state.session_factory
     from workers.tasks import run_scan
@@ -119,9 +124,44 @@ async def create_bulk_scan(
         results.append(BulkScanResult(url=url, scan_id=sid))
 
     return BulkScanAccepted(
-        batch_id=batch_id, accepted=len(results) - skipped,
-        skipped=skipped, results=results,
+        batch_id=batch_id,
+        accepted=len(results) - skipped,
+        skipped=skipped,
+        results=results,
     )
+
+
+BATCH_STATUSES = ("queued", "running", "completed", "failed", "waf_blocked")
+
+
+@router.get("/bulk/{batch_id}")
+async def get_bulk_progress(
+    batch_id: str,
+    request: Request,
+    auth: AuthContext = Depends(require_api_key),
+) -> dict:
+    """Progress of one bulk batch: totals + per-status counts (owner-scoped)."""
+    session_factory = request.app.state.session_factory
+    async with session_factory() as session:
+        rows = (
+            await session.execute(
+                sa.select(Scan.status, sa.func.count())
+                .where(
+                    Scan.user_id == uuid.UUID(auth.user_id),
+                    Scan.options.op("->>")("batch_id") == batch_id,
+                )
+                .group_by(Scan.status)
+            )
+        ).all()
+    by_status = {s: 0 for s in BATCH_STATUSES}
+    for status, count in rows:
+        by_status[status] = by_status.get(status, 0) + count
+    total = sum(by_status.values())
+    if total == 0:
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "batch not found"}
+        )
+    return {"batch_id": batch_id, "total": total, "by_status": by_status}
 
 
 def _parse_csv_urls(raw: str) -> list[str]:
@@ -153,12 +193,14 @@ async def get_scan(
     try:
         uuid.UUID(scan_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail={
-            "code": "not_found", "message": "scan not found"}) from exc
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "scan not found"}
+        ) from exc
     scan = await _get_scan_for_user(session_factory, scan_id, auth.user_id)
     if scan is None:
-        raise HTTPException(status_code=404, detail={
-            "code": "not_found", "message": "scan not found"})
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "scan not found"}
+        )
 
     if scan.status not in ("completed", "waf_blocked"):
         return ScanAccepted(scan_id=str(scan.id), status=scan.status)
@@ -252,24 +294,29 @@ async def get_scan_diff(
     try:
         sid = uuid.UUID(scan_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail={
-            "code": "not_found", "message": "scan not found"}) from exc
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": "scan not found"}
+        ) from exc
 
     async with session_factory() as session:
         scan = (
             await session.execute(
-                sa.select(Scan).where(Scan.id == sid,
-                                      Scan.user_id == uuid.UUID(auth.user_id))
+                sa.select(Scan).where(Scan.id == sid, Scan.user_id == uuid.UUID(auth.user_id))
             )
         ).scalar_one_or_none()
         if scan is None:
-            raise HTTPException(status_code=404, detail={
-                "code": "not_found", "message": "scan not found"})
+            raise HTTPException(
+                status_code=404, detail={"code": "not_found", "message": "scan not found"}
+            )
 
         prev = await _previous_snapshot(session, scan, days)
         if prev is None:
-            return {"scan_id": scan_id, "days": days, "changes": [],
-                    "note": "no prior scan in window"}
+            return {
+                "scan_id": scan_id,
+                "days": days,
+                "changes": [],
+                "note": "no prior scan in window",
+            }
         prev_snapshot = prev
 
     current = await build_snapshot(session_factory, scan)
@@ -413,9 +460,7 @@ async def list_scans(
         from sqlalchemy.dialects.postgresql import ARRAY
 
         query = query.where(
-            sa.type_coerce(AntibotFinding.waf_providers, ARRAY(sa.Text)).contains(
-                [waf_provider]
-            )
+            sa.type_coerce(AntibotFinding.waf_providers, ARRAY(sa.Text)).contains([waf_provider])
         )
     if min_difficulty is not None:
         query = query.where(Scan.difficulty_score >= min_difficulty)
@@ -429,15 +474,22 @@ async def list_scans(
             await session.execute(sa.select(sa.func.count()).select_from(query.subquery()))
         ).scalar_one()
         rows = (
-            await session.execute(
-                query.order_by(Scan.created_at.desc()).limit(min(limit, 200)).offset(offset)
+            (
+                await session.execute(
+                    query.order_by(Scan.created_at.desc()).limit(min(limit, 200)).offset(offset)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     items = [
         ScanSummary(
-            scan_id=str(s.id), url=s.url, normalized_url=s.normalized_url,
-            status=s.status, difficulty_score=s.difficulty_score,
+            scan_id=str(s.id),
+            url=s.url,
+            normalized_url=s.normalized_url,
+            status=s.status,
+            difficulty_score=s.difficulty_score,
             security_score=s.security_score,
             created_at=s.created_at.isoformat() if s.created_at else None,
             completed_at=s.completed_at.isoformat() if s.completed_at else None,

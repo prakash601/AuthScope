@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AuthScope — Login Intelligence &amp; Anti-Bot Detection Platform</title>
+<meta name="description" content="Given a login URL, AuthScope returns a complete fingerprint of that page: who powers the authentication, how secure it is, and what will block automation." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a class="logo" href="#top"><span class="logo-mark">AS</span>AuthScope</a>
+    <div class="nav-links">
+      <a href="#product">Product</a>
+      <a href="#scoring">Scoring</a>
+      <a href="#api">API</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-primary" href="#get-started">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>LOGIN INTELLIGENCE PLATFORM</span>
+      <h1>Know what you're up against<br /><span class="grad">before you build.</span></h1>
+      <p class="sub">
+        AuthScope takes any login URL and returns a complete fingerprint of that page:
+        who powers the authentication, how secure it is, and exactly what will block automation.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#get-started">Start scanning</a>
+        <a class="btn btn-ghost" href="#product">Explore the product</a>
+        <span class="hero-note">Detection only — never bypasses captchas or WAFs.</span>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="term-bar"><span class="r"></span><span class="y"></span><span class="g"></span><span class="title mono">GET /v1/scans/{id}</span></div>
+      <div class="term-body"><span class="tk-cmd">$ curl api.authscope.dev/v1/scans/7b9c0f2a</span>
+{
+  <span class="tk-key">"status"</span>: <span class="tk-str">"completed"</span>,
+  <span class="tk-key">"auth"</span>: {
+    <span class="tk-key">"provider"</span>: <span class="tk-str">"auth0"</span>, <span class="tk-key">"confidence"</span>: <span class="tk-num">0.97</span>,
+    <span class="tk-key">"flows"</span>: [<span class="tk-str">"oauth_code"</span>, <span class="tk-str">"password"</span>]
+  },
+  <span class="tk-key">"antibot"</span>: {
+    <span class="tk-key">"difficulty_score"</span>: <span class="tk-num">87</span>,
+    <span class="tk-key">"waf_providers"</span>: [<span class="tk-str">"akamai"</span>, <span class="tk-str">"datadome"</span>],
+    <span class="tk-key">"captcha"</span>: { <span class="tk-key">"type"</span>: <span class="tk-str">"turnstile_invisible"</span> },
+    <span class="tk-key">"cookies"</span>: [<span class="tk-str">"_abck"</span>, <span class="tk-str">"_datadome"</span>]
+  },
+  <span class="tk-key">"artifacts"</span>: { <span class="tk-key">"har_url"</span>: <span class="tk-str">"s3://…/har.json"</span> }
+}<span class="caret"></span></div>
+    </div>
+  </div>
+</header>
+
+<div class="stats-band">
+  <div class="container stats">
+    <div class="stat"><b>40+</b><span>Auth providers detected</span></div>
+    <div class="stat"><b>74</b><span>Versioned detection signatures</span></div>
+    <div class="stat"><b>5</b><span>Parallel detectors per scan</span></div>
+    <div class="stat"><b>1,000</b><span>URLs per bulk scan</span></div>
+  </div>
+</div>
+
+<section id="product">
+  <div class="container">
+    <div class="sec-head center reveal">
+      <div class="sec-tag">The Product</div>
+      <h2>One URL in. Three answers out.</h2>
+      <p>AuthScope launches an isolated, instrumented browser session and correlates every signal on the page — then hands you a report backed by hard evidence.</p>
+    </div>
+    <div class="q-grid">
+      <div class="q-card reveal">
+        <div class="q-num">01 / AUTH PROVIDER</div>
+        <h3>Who handles auth?</h3>
+        <p>Identify the authentication provider and flow through multi-signal correlation — script URLs, global JS objects, well-known network probes, and form analysis.</p>
+        <div class="chips">
+          <span class="chip">Auth0</span><span class="chip">Firebase Auth</span><span class="chip">Okta</span><span class="chip">Cognito</span><span class="chip">Clerk</span><span class="chip">Keycloak</span><span class="chip">40+ more</span>
+        </div>
+        <div class="chips">
+          <span class="chip">OAuth2</span><span class="chip">OIDC</span><span class="chip">SAML</span><span class="chip">Passkey</span><span class="chip">Magic Link</span><span class="chip">OTP</span>
+        </div>
+      </div>
+      <div class="q-card reveal">
+        <div class="q-num">02 / SECURITY AUDIT</div>
+        <h3>How secure is it?</h3>
+        <p>Audit the security posture of the login page and produce a Risk Score from misconfigurations — every finding backed by raw evidence.</p>
+        <div class="chips">
+          <span class="chip">HSTS</span><span class="chip">CSP</span><span class="chip">X-Frame-Options</span><span class="chip">COOP/CORP</span><span class="chip">Cookie flags</span><span class="chip">CSRF tokens</span><span class="chip">MFA indicators</span><span class="chip">Password policy</span>
+        </div>
+      </div>
+      <div class="q-card reveal">
+        <div class="q-num">03 / BLOCKER MAP</div>
+        <h3>What will block automation?</h3>
+        <p>Map every anti-bot defense on the page with vendor-level precision, then score the difficulty of automating it.</p>
+        <div class="chips">
+          <span class="chip">reCAPTCHA v2/v3</span><span class="chip">hCaptcha</span><span class="chip">Turnstile</span><span class="chip">Arkose</span><span class="chip">GeeTest</span>
+        </div>
+        <div class="chips">
+          <span class="chip">Cloudflare</span><span class="chip">DataDome</span><span class="chip">PerimeterX</span><span class="chip">Akamai</span><span class="chip">Kasada</span><span class="chip">Imperva</span>
+        </div>
+        <div class="chips">
+          <span class="chip">FingerprintJS</span><span class="chip">Castle</span><span class="chip">Sift</span><span class="chip">Honeypots</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-head center reveal" style="margin-top:80px;margin-bottom:40px">
+      <div class="sec-tag">Platform Capabilities</div>
+      <h2>Everything you need to scope login targets</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <h3>Versioned signature engine</h3>
+        <p>74 declarative YAML signatures hot-reloaded into workers — detection rules update without deploys.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        <h3>Historical diffing</h3>
+        <p>"What changed on this login page in the last 30 days?" Provider swaps, new captchas, removed headers, score deltas.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M8 4v16"/></svg>
+        <h3>Bulk scanning at scale</h3>
+        <p>Upload a CSV of up to 1,000 URLs and get a batch of full reports back through webhooks or polling.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20"/></svg>
+        <h3>Geo-distributed exits</h3>
+        <p>Per-country proxy routing with automatic retry from a different region when a target blocks the first attempt.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h3>Signed webhooks &amp; polling</h3>
+        <p>HMAC-SHA256-signed completion callbacks with exponential-backoff retries and a dead-letter queue.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+        <h3>Feedback-driven accuracy</h3>
+        <p>Flag false positives via API; per-signature precision stats continuously feed detection tuning.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="scoring">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Scoring</div>
+      <h2>Scores you can act on — with reasoning attached</h2>
+      <p>No black boxes. Every point is itemized so you know exactly why a target is hard to automate or risky to trust.</p>
+    </div>
+    <div class="score-wrap">
+      <div class="score-card reveal">
+        <h3>Automation Difficulty Score</h3>
+        <p>Weighted composite of every detected blocker.</p>
+        <div class="score-big hard">87<span style="font-size:1.1rem;color:var(--muted)">/100</span></div>
+        <div class="bar-row"><span class="bar-label">Akamai Bot Manager (TLS + sensor)</span><div class="bar-track"><div class="bar-fill b-red" style="width:92%"></div></div></div>
+        <div class="bar-row"><span class="bar-label">Invisible Turnstile (managed)</span><div class="bar-track"><div class="bar-fill b-red" style="width:80%"></div></div></div>
+        <div class="bar-row"><span class="bar-label">DataDome fingerprinting</span><div class="bar-track"><div class="bar-fill b-amber" style="width:64%"></div></div></div>
+        <div class="bar-row"><span class="bar-label">FPJS Pro bot detection</span><div class="bar-track"><div class="bar-fill b-cyan" style="width:45%"></div></div></div>
+        <div class="reasoning">"Very hard — Akamai Bot Manager (TLS + sensor), invisible Turnstile, DataDome fingerprinting detected."</div>
+      </div>
+      <div class="score-card reveal">
+        <h3>Risk Score</h3>
+        <p>Security misconfigurations found during the audit.</p>
+        <div class="score-big risk">34<span style="font-size:1.1rem;color:var(--muted)">/100</span></div>
+        <div class="bar-row"><span class="bar-label">Missing CSP header</span><div class="bar-track"><div class="bar-fill b-amber" style="width:55%"></div></div></div>
+        <div class="bar-row"><span class="bar-label">Cookie missing SameSite</span><div class="bar-track"><div class="bar-fill b-amber" style="width:38%"></div></div></div>
+        <div class="bar-row"><span class="bar-label">HSTS present (max-age=31536000)</span><div class="bar-track"><div class="bar-fill b-cyan" style="width:12%"></div></div></div>
+        <div class="reasoning">"Moderate risk — CSP absent and session cookie lacks SameSite; HSTS correctly enforced."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="container">
+    <div class="sec-head center reveal">
+      <div class="sec-tag">How it works</div>
+      <h2>From URL to full report in seconds</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Submit &amp; queue</h3>
+        <p>The API normalizes your URL, checks the result cache, and enqueues a durable scan job.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Instrument &amp; navigate</h3>
+        <p>An isolated browser context with a rotated fingerprint loads the page under deep instrumentation — network, DOM, and runtime all captured.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Detect in parallel</h3>
+        <p>Five detectors analyze the collected artifact simultaneously, merging results with confidence scoring and conflict resolution.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Persist &amp; deliver</h3>
+        <p>Evidence lands in storage, the report becomes queryable, and a signed webhook notifies you — or poll until done.</p>
+      </div>
+    </div>
+
+    <div class="sec-head reveal" style="margin-top:76px">
+      <div class="sec-tag">Evidence, not vibes</div>
+      <h2>Every finding ships with proof</h2>
+      <p>AuthScope records which signal fired, where it fired, and keeps the raw artifacts so you can verify every claim yourself.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+        <h3>HAR file</h3>
+        <p>Complete request/response log including timings — loadable by any HAR viewer.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <h3>Full-page screenshot</h3>
+        <p>Full-page PNG captured at scan completion.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <h3>DOM snapshot</h3>
+        <p>Post-load serialized DOM, PII-stripped before persistence.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="api">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Developer API</div>
+      <h2>Built for integration from day one</h2>
+      <p>A clean REST API with API-key auth, sensible rate limits, and delivery via signed webhooks or polling.</p>
+    </div>
+    <div class="api-grid">
+      <div class="terminal reveal">
+        <div class="term-bar"><span class="r"></span><span class="y"></span><span class="g"></span><span class="title mono">create-scan.sh</span></div>
+        <div class="term-body"><span class="tk-cmd"># Single scan — async job</span>
+$ curl -X POST .../v1/scans \
+    -H <span class="tk-str">"X-API-Key: $KEY"</span> \
+    -d <span class="tk-str">'{"url": "...", "options":
+         {"proxy_country": "us",
+          "deep_scan": true}}'</span>
+→ <span class="tk-num">202</span> {<span class="tk-key">"scan_id"</span>: <span class="tk-str">"7b9c0f2a…"</span>,
+     <span class="tk-key">"status"</span>: <span class="tk-str">"queued"</span>}
+
+<span class="tk-cmd"># Bulk scan — CSV of up to 1000 URLs</span>
+$ curl -X POST .../v1/scans/bulk \
+    --data-binary @urls.csv
+→ batch id + per-URL scan ids
+
+<span class="tk-cmd"># Historical diff</span>
+$ GET /v1/scans/{id}/diff?days=30</div>
+      </div>
+      <div class="terminal reveal">
+        <div class="term-bar"><span class="r"></span><span class="y"></span><span class="g"></span><span class="title mono">webhook-payload.json</span></div>
+        <div class="term-body"><span class="tk-cmd"># On completion, endpoints receive
+# an HMAC-SHA256 signed POST:</span>
+POST https://your-app.example/hooks
+X-AuthScope-Signature: sha256=<span class="tk-num">a41f…</span>
+
+{
+  <span class="tk-key">"scan_id"</span>: <span class="tk-str">"7b9c0f2a…"</span>,
+  <span class="tk-key">"url"</span>: <span class="tk-str">"https://example.com/login"</span>,
+  <span class="tk-key">"difficulty_score"</span>: <span class="tk-num">87</span>,
+  <span class="tk-key">"risk_score"</span>: <span class="tk-num">34</span>,
+  <span class="tk-key">"auth"</span>: { … }, <span class="tk-key">"security"</span>: { … },
+  <span class="tk-key">"antibot"</span>: { … }
+}
+<span class="tk-dim"># retries with exponential backoff,
+# dead-letter queue for failures</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="usecases">
+  <div class="container">
+    <div class="sec-head center reveal">
+      <div class="sec-tag">Use cases</div>
+      <h2>One platform, many jobs to be done</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        <h3>Pre-build feasibility checks</h3>
+        <p>Know if a site is automatable before investing weeks building an integration. Get the difficulty score and blocker inventory upfront.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <h3>Continuous security audits</h3>
+        <p>Audit your own or third-party login pages. Track regressions over time — did our CSP header disappear? Did MFA prompts vanish?</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <h3>Competitive intelligence</h3>
+        <p>"Which SSO provider does our competitor use? Do they enforce MFA?" Answered with evidence, not guesses.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <h3>Customer pre-flight checks</h3>
+        <p>Solutions engineers validate customer login stacks before committing to integrations — no more surprises mid-project.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+        <h3>Research at scale</h3>
+        <p>Large-scale analysis of auth and anti-bot adoption across the web via bulk scans of thousands of endpoints.</p>
+      </div>
+      <div class="feat reveal">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <h3>Vendor change monitoring</h3>
+        <p>Track when targets swap captcha vendors or add WAF layers — meaningful protection changes surfaced automatically.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="alt">
+  <div class="container">
+    <div class="sec-head center reveal">
+      <div class="sec-tag">FAQ</div>
+      <h2>Frequently asked questions</h2>
+    </div>
+    <div class="faq reveal">
+      <details open>
+        <summary>Does AuthScope bypass captchas or bot protection?</summary>
+        <p class="faq-a">No. AuthScope strictly detects and reports. It never solves captchas, evades WAFs, or automates logins — it tells you what defenses exist so you can plan accordingly.</p>
+      </details>
+      <details>
+        <summary>Is scanning a website with AuthScope legal?</summary>
+        <p class="faq-a">AuthScope performs passive detection only — the same signals visible to any browser visiting the page. It's designed for auditing sites you own, have permission to test, or for lawful research purposes. Users are responsible for complying with applicable terms of service and laws.</p>
+      </details>
+      <details>
+        <summary>What happens if a site blocks the scan?</summary>
+        <p class="faq-a">A blocked first attempt triggers one retry from a different geographic exit. If still blocked, the scan completes as <span class="mono">waf_blocked</span> — which is itself valuable intelligence about the target's defenses.</p>
+      </details>
+      <details>
+        <summary>How current are the detection signatures?</summary>
+        <p class="faq-a">Signatures are declarative YAML files with version tracking, hot-reloaded into workers without deploys. New providers, captchas, and WAFs can be added and go live within minutes.</p>
+      </details>
+      <details>
+        <summary>Can I integrate reports into my own systems?</summary>
+        <p class="faq-a">Yes — every scan is delivered via HMAC-SHA256-signed webhooks with automatic retries and a dead-letter queue, or via simple polling against the REST API. Reports are plain JSON.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="get-started">
+  <div class="cta-band" style="border:none;padding-left:0;padding-right:0;background:none">
+    <div class="sec-tag">Get started</div>
+    <h2>Your first login fingerprint is one call away</h2>
+    <p>Point AuthScope at any login page and get a full report in seconds.<br />Free tier included — no credit card required.</p>
+    <div class="cta-btns">
+      <a class="btn btn-primary" href="mailto:hello@authscope.dev">Request access</a>
+      <a class="btn btn-ghost" href="#product">Explore the product</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="foot-inner">
+      <a class="logo" href="#top" style="font-size:1rem"><span class="logo-mark" style="width:24px;height:24px;font-size:.72rem">AS</span>AuthScope</a>
+      <div class="foot-links">
+        <a href="#product">Product</a>
+        <a href="#scoring">Scoring</a>
+        <a href="#api">API</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </div>
+    <p class="disclaimer">
+      Disclaimer: AuthScope detects and reports. It does not solve captchas, bypass bot protection,
+      or automate logins. Users are responsible for ensuring their use complies with applicable terms
+      of service and laws.
+    </p>
+    <p style="margin-top:14px;font-size:.78rem">&copy; 2026 AuthScope. All rights reserved.</p>
+  </div>
+</footer>
+
+<script>
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+
+</body>
+</html>

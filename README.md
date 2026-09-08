@@ -517,6 +517,7 @@ https://site-b.com/signin
 ```
 
 Accepts up to 1000 URLs; returns a batch id and per-URL scan ids.
+Track progress via `GET /v1/scans/bulk/{batch_id}` (total + per-status counts).
 
 ### Other endpoints
 
@@ -527,10 +528,12 @@ Accepts up to 1000 URLs; returns a batch id and per-URL scan ids.
 | `POST` | `/v1/scans/{id}/feedback` | Flag false positives / confirm detections |
 | `GET` | `/v1/signatures` | List active signatures (debugging/transparency) |
 | `POST` | `/v1/webhooks` | Register webhook endpoints |
+| `GET` | `/v1/webhooks/dlq` | List dead-lettered deliveries (re-drive candidates) |
+| `POST` | `/v1/webhooks/dlq/{id}/redrive` | Re-deliver one dead-lettered webhook |
 
 ### Webhook payload
 
-On scan completion, registered endpoints receive a signed POST containing the same report JSON as `GET /v1/scans/{id}`. Failed deliveries retry with exponential backoff.
+On scan completion, registered endpoints receive a signed POST containing the same report JSON as `GET /v1/scans/{id}`. Failed deliveries retry with exponential backoff, then land in the DLQ (`GET /v1/webhooks/dlq`) for manual re-drive.
 
 ---
 
@@ -631,8 +634,8 @@ cd authscope
 make install            # venv, deps, chromium
 make compose-up         # postgres + redis + minio
 make db-upgrade         # schema migrations
-python -m db.seed       # dev API key ("dev-key")
-python -m db.load_signatures   # load 74 detection signatures
+.venv/bin/python -m db.seed       # dev API key ("dev-key")
+make signatures-load    # load 74 detection signatures (.venv/bin/python -m db.load_signatures)
 
 # terminal 1
 make run-api            # http://localhost:8000 (docs at /docs)
@@ -665,7 +668,7 @@ Other useful commands: `make test` (130 tests), `make coverage` (90% overall), `
 
 ## License
 
-TBD.
+Proprietary — see [LICENSE](./LICENSE). Contact hello@authscope.dev for licensing inquiries.
 
 ## Disclaimer
 

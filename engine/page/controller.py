@@ -30,12 +30,36 @@ CHALLENGE_MARKERS: tuple[str, ...] = (
     "_Incapsula_resource",
 )
 
+# Deep-scan body capture: text-ish payloads only, hard-capped per response.
+DEEP_SCAN_BODY_CAP = 65_536
+_TEXT_BODY_HINTS = ("text/", "json", "javascript", "xml", "urlencoded")
 
-def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
+
+def _is_text_body(content_type: str) -> bool:
+    ct = content_type.lower()
+    return not ct or any(h in ct for h in _TEXT_BODY_HINTS)
+
+
+def _har_time(ts: float | None) -> str:
+    """Format epoch seconds as HAR ISO-8601; never emit the 1970 stub."""
+    from datetime import UTC, datetime
+
+    if ts is None:
+        ts = time.time()
+    return (
+        datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    )
+
+
+def build_har(
+    entries: list[CapturedRequest], page_url: str, scan_started_at: float | None = None
+) -> dict:
     """Assemble a HAR 1.2 document from captured requests."""
+    page_started = _har_time(scan_started_at)
     har_entries = []
     for r in entries:
-        started = "1970-01-01T00:00:00.000Z"
+        started = _har_time(r.started_at or scan_started_at)
+        elapsed = r.duration_ms if r.duration_ms is not None else 0
         qs_pos = r.url.find("?")
         qs = []
         if qs_pos != -1:
@@ -45,7 +69,7 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
         har_entries.append(
             {
                 "startedDateTime": started,
-                "time": -1,
+                "time": elapsed,
                 "_resourceType": r.resource_type,
                 "request": {
                     "method": r.method,
@@ -60,16 +84,14 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
                     "status": r.status or 0,
                     "statusText": "",
                     "httpVersion": "HTTP/1.1",
-                    "headers": [
-                        {"name": k, "value": v} for k, v in r.response_headers.items()
-                    ],
+                    "headers": [{"name": k, "value": v} for k, v in r.response_headers.items()],
                     "content": {"size": 0, "mimeType": r.response_headers.get("content-type", "")},
                     "redirectURL": r.response_headers.get("location", ""),
                     "headersSize": -1,
                     "bodySize": 0,
                 },
                 "cache": {},
-                "timings": {"send": 0, "wait": -1, "receive": 0},
+                "timings": {"send": 0, "wait": elapsed, "receive": 0},
             }
         )
     return {
@@ -81,7 +103,7 @@ def build_har(entries: list[CapturedRequest], page_url: str) -> dict:
                     "id": "page_1",
                     "pageTimings": {},
                     "title": page_url,
-                    "startedDateTime": "1970-01-01T00:00:00.000Z",
+                    "startedDateTime": page_started,
                 }
             ],
             "entries": har_entries,
@@ -113,8 +135,13 @@ class PageController:
             else (settings_lazy or 0)
         )
 
-    async def _robots_disallows(self, url: str) -> bool:
-        """Check robots.txt when the org-policy flag is enabled."""
+    async def _robots_disallows(self, url: str, context=None) -> bool:
+        """Check robots.txt when the org-policy flag is enabled.
+
+        Fetches through the scan's browser context (proxy/country honored);
+        falls back to a direct fetch only if the context path fails.
+        Unreadable robots.txt = allowed (fail-open).
+        """
         from config import get_settings
 
         try:
@@ -123,17 +150,25 @@ class PageController:
             return False
         if not settings.scan.respect_robots_txt:
             return False
-        import urllib.request
         from urllib.parse import urlsplit
         from urllib.robotparser import RobotFileParser
 
         parts = urlsplit(url)
         robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
-        try:
-            with urllib.request.urlopen(robots_url, timeout=5) as resp:
-                body = resp.read().decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001 — no/unreadable robots.txt = allowed
-            return False
+        body: str | None = None
+        if context is not None:
+            with contextlib.suppress(Exception):
+                resp = await context.request.get(robots_url, timeout=5000)
+                if resp.ok:
+                    body = await resp.text()
+        if body is None:
+            import urllib.request
+
+            try:
+                with urllib.request.urlopen(robots_url, timeout=5) as resp:
+                    body = resp.read().decode("utf-8", errors="replace")
+            except Exception:  # noqa: BLE001 — no/unreadable robots.txt = allowed
+                return False
         parser = RobotFileParser()
         parser.parse(body.splitlines())
         ua = "*"
@@ -148,6 +183,7 @@ class PageController:
         context = managed.context
         page = await context.new_page()
         started = time.monotonic()
+        scan_started_at = time.time()
         requests: dict[str, CapturedRequest] = {}
         main_response_headers: dict[str, str] = {}
         main_status: int | None = None
@@ -164,16 +200,32 @@ class PageController:
         async def on_response(response: Response) -> None:
             nonlocal main_status, final_url, main_response_headers
             req: Request = response.request
+            now = time.time()
             entry = requests.setdefault(
                 req.url,
                 CapturedRequest(url=req.url, method=req.method, resource_type=req.resource_type),
             )
+            if entry.started_at is None:
+                entry.started_at = now
+            else:
+                entry.duration_ms = max(0, int((now - entry.started_at) * 1000))
             entry.is_xhr_fetch = entry.is_xhr_fetch or req.resource_type in ("xhr", "fetch")
             with contextlib.suppress(Exception):  # response may be gone already
                 entry.status = response.status
                 entry.response_headers = {
                     k.lower(): v for k, v in (await response.all_headers()).items()
                 }
+            if deep_scan and entry.response_body is None:
+                with contextlib.suppress(Exception):
+                    ctype = entry.response_headers.get("content-type", "")
+                    if _is_text_body(ctype):
+                        raw = await response.body()
+                        text = raw.decode("utf-8", errors="replace")
+                        if len(text) > DEEP_SCAN_BODY_CAP:
+                            entry.response_body = text[:DEEP_SCAN_BODY_CAP]
+                            entry.response_body_truncated = True
+                        else:
+                            entry.response_body = text
             if response.request.is_navigation_request() and response.frame == page.main_frame:
                 main_status = response.status
                 final_url = response.url
@@ -187,6 +239,8 @@ class PageController:
                 req.url,
                 CapturedRequest(url=req.url, method=req.method, resource_type=req.resource_type),
             )
+            if entry.started_at is None:
+                entry.started_at = time.time()
             entry.request_headers = {k.lower(): v for k, v in req.headers.items()}
 
         page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
@@ -200,7 +254,7 @@ class PageController:
         goto_error: str | None = None
 
         # Optional robots.txt compliance (org policy flag, off by default).
-        if await self._robots_disallows(url):
+        if await self._robots_disallows(url, context):
             logger.info("robots.txt disallows %s — skipping navigation", url)
             artifact = PageArtifact(
                 url=url,
@@ -265,7 +319,7 @@ class PageController:
             logger.debug("screenshot failed", exc_info=True)
         await page.close()
 
-        har = build_har(request_list, url)
+        har = build_har(request_list, url, scan_started_at)
         artifact = PageArtifact(
             url=url,
             final_url=final_url,
