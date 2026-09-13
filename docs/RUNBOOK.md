@@ -51,6 +51,12 @@ Signatures live in Git (`signatures/*.yaml`). PR → merge → run
   the assigned proxy/country like any other navigation.
 - All reports carry the detection-only disclaimer; AuthScope never bypasses protections.
 
+## Agent access (MCP)
+Agents can drive scans through the MCP server (`mcp_server/`, extra `mcp`):
+`authscope-mcp` (stdio) or `authscope-mcp --transport http --port 8765`. It uses
+the same API keys and rate limits. HTTP is loopback-only; `--allow-remote`
+requires `AUTHSCOPE_MCP_TOKEN`. See [`MCP.md`](./MCP.md).
+
 ## Logs
 API emits one JSON `http_access` line per request (request_id, method, route,
 status, duration_ms) to stdout — point any shipper (Fluent Bit/Vector → Elasticsearch/Loki) at container logs; no dedicated log infra in compose by design.

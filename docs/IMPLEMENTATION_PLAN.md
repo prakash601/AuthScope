@@ -17,6 +17,7 @@
 | **M2 — Pipeline & Scoring** | Aggregation, conflict resolution, scores | ISS-015 – ISS-016 | ✅ |
 | **M3 — API & Orchestration** | FastAPI, Celery jobs, webhooks, caching | ISS-017 – ISS-023 | ✅ |
 | **M4 — Platform & Hardening** | Dashboard, diff, feedback loop, observability, CI | ISS-024 – ISS-029 | ✅ |
+| **M5 — Agent Integration** | MCP server exposing scans as agent tools | ISS-030 | ✅ |
 
 Dependency rule: within a milestone, issues must be done in order unless explicitly marked "parallelizable".
 
@@ -499,6 +500,22 @@ Dependency rule: within a milestone, issues must be done in order unless explici
 - [x] Load test: 50 concurrent scans sustained without OOM or queue starvation; metrics captured
 - [x] Secrets via env-injected secret store only — none in images or repo
 - [x] Runbook doc: common failures (waf_blocked spikes, broker down, S3 errors)
+
+---
+
+## M5 — Agent Integration
+
+### ISS-030 — MCP server for agent access
+**Status:** ✅
+
+**What it does:** Exposes the scan API as a Model Context Protocol server so agents can run scans, read reports, diff history, drive bulk batches and record feedback without hand-rolling HTTP calls. Thin client over `/v1` — reuses API-key auth, rate limiting and ownership scoping. Optional extra `mcp`; console script `authscope-mcp`; stdio, Streamable HTTP and legacy SSE transports; loopback-only HTTP unless `--allow-remote` with a bearer token.
+
+**Acceptance criteria:**
+- [x] MCP tools cover scan lifecycle, discovery, bulk, feedback and health
+- [x] stdio + HTTP transports; bearer-gated remote binding
+- [x] Compact report summaries with opt-in raw output; no key leakage
+- [x] Tests green against the API in-process; lint/typecheck/coverage wired in CI
+- [x] `docs/MCP.md` with agent config and security notes
 
 ---
 

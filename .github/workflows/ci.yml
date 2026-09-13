@@ -40,14 +40,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,mcp]"
       - run: playwright install --with-deps chromium
       - name: start MinIO
         run: |
           docker run -d --name minio --network host \
             -e MINIO_ROOT_USER=authscope-dev \
             -e MINIO_ROOT_PASSWORD=authscope-dev-secret \
-            minio/minio:latest server /data
+            quay.io/minio/minio:latest server /data
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 2
@@ -57,14 +57,14 @@ jobs:
         run: |
           docker run --rm --network host \
             -e MC_HOST_local="http://authscope-dev:authscope-dev-secret@localhost:9000" \
-            minio/mc:latest mc mb --ignore-existing local/authscope-artifacts
+            quay.io/minio/mc:latest mc mb --ignore-existing local/authscope-artifacts
           docker run --rm --network host \
             -e MC_HOST_local="http://authscope-dev:authscope-dev-secret@localhost:9000" \
-            minio/mc:latest mc stat local/authscope-artifacts
+            quay.io/minio/mc:latest mc stat local/authscope-artifacts
       - name: lint
-        run: ruff check api engine pipeline workers db telemetry.py tests
+        run: ruff check api engine pipeline workers db mcp_server telemetry.py tests
       - name: typecheck
-        run: mypy config.py api engine pipeline workers db telemetry.py
+        run: mypy config.py api engine pipeline workers db mcp_server telemetry.py
       - name: migrations
         run: alembic upgrade head
       - name: load signatures
@@ -73,6 +73,7 @@ jobs:
         run: >
           pytest tests/
           --cov=engine --cov=pipeline --cov=api --cov=workers --cov=db --cov=config
+          --cov=mcp_server
           --cov-report=term-missing --cov-fail-under=70
       - uses: actions/upload-artifact@v4
         if: always()
