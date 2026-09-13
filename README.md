@@ -151,6 +151,7 @@ Per scan, stored to object storage:
 | **Signature Management** | Add/update/disable detection signatures at runtime — no deploy required. YAML in Git → loaded to Postgres → hot-reloaded into workers |
 | **Proxy & Identity Pool** | Managed residential proxy pools (per-country routing) and rotating browser identities for scanning hard targets |
 | **False-positive feedback loop** | Mark findings as false positives; feeds model retraining and signature tuning |
+| **Agent integration (MCP)** | Model Context Protocol server exposing scans as agent tools over stdio / Streamable HTTP / SSE — see [`docs/MCP.md`](docs/MCP.md) |
 
 ### C. Scoring
 
@@ -349,6 +350,7 @@ See [Signature System](#signature-system).
 | Search & logs | Elasticsearch + Kibana | Request-level log search |
 | Observability | Prometheus + Grafana, OpenTelemetry | Metrics + distributed tracing |
 | Signatures | YAML in Git → Postgres, versioned | Review workflow + runtime updates without deploys |
+| Agent integration | Model Context Protocol (`mcp` SDK) | Exposes the scan API as MCP tools for local or networked agents |
 
 ---
 
@@ -531,6 +533,20 @@ Track progress via `GET /v1/scans/bulk/{batch_id}` (total + per-status counts).
 | `GET` | `/v1/webhooks/dlq` | List dead-lettered deliveries (re-drive candidates) |
 | `POST` | `/v1/webhooks/dlq/{id}/redrive` | Re-deliver one dead-lettered webhook |
 
+### MCP server (agent integration)
+
+AuthScope ships a [Model Context Protocol](https://modelcontextprotocol.io) server so agents can drive scans directly. It wraps the same `/v1` API and is an optional extra:
+
+```bash
+pip install -e ".[mcp]"          # or: uvx --from 'authscope[mcp]' authscope-mcp
+export AUTHSCOPE_API_URL=http://localhost:8000
+export AUTHSCOPE_API_KEY=...
+authscope-mcp                    # stdio (default)
+authscope-mcp --transport http --port 8765   # Streamable HTTP
+```
+
+Tools: `create_scan`, `get_scan`, `wait_for_scan`, `scan_and_wait`, `list_scans`, `get_diff`, `bulk_scan`, `bulk_progress`, `submit_feedback`, `feedback_stats`, `health`. Setup, agent config, and security notes live in [`docs/MCP.md`](docs/MCP.md).
+
 ### Webhook payload
 
 On scan completion, registered endpoints receive a signed POST containing the same report JSON as `GET /v1/scans/{id}`. Failed deliveries retry with exponential backoff, then land in the DLQ (`GET /v1/webhooks/dlq`) for manual re-drive.
@@ -609,6 +625,7 @@ authscope/
 │   └── fingerprinting.yaml
 ├── db/                       # Migrations, models (Postgres, ClickHouse)
 ├── dashboard/                # Web UI
+├── mcp_server/               # MCP server for agent access (stdio / HTTP / SSE)
 ├── ai/                       # Phase 1+ microservices (classifier, vision, scoring)
 └── tests/
 ```
@@ -655,6 +672,13 @@ curl -X POST http://localhost:8000/v1/scans \
 # → 202 {"scan_id": "...", "status": "queued"}
 
 curl http://localhost:8000/v1/scans/<scan_id> -H "X-API-Key: dev-key"
+```
+
+Or drive it from an agent over MCP (`make install` includes the extra):
+
+```bash
+export AUTHSCOPE_API_KEY=dev-key
+authscope-mcp            # stdio; see docs/MCP.md for HTTP and agent config
 ```
 
 Other useful commands: `make test` (130 tests), `make coverage` (90% overall), `make lint`.

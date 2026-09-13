@@ -44,6 +44,24 @@ Dashboard at http://localhost:8000/dashboard/: paste `dev-key` → New scan →
 auto-poll → Report (scores, auth/security/antibot, evidence links) → Diff view
 with `?days=30`.
 
+## Option C — drive it from an agent (MCP)
+
+```bash
+pip install -e ".[mcp]"
+export AUTHSCOPE_API_URL=http://localhost:8000
+export AUTHSCOPE_API_KEY=dev-key
+authscope-mcp                 # stdio; or: --transport http --port 8765
+```
+
+Add the server to your agent (see [`MCP.md`](MCP.md) for OpenCode/Claude
+config) and ask it to run a scan — the agent gets tools like `scan_and_wait`,
+`list_scans` and `get_diff`:
+
+```
+scan_and_wait("https://example.com/login")
+→ summary: provider auth0, difficulty 0, risk 80, presigned HAR/screenshot links
+```
+
 ## Evidence per scan
 
 HAR (`startedDateTime` real ISO-8601, `time` measured), full-page PNG,

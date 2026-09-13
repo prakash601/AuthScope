@@ -121,10 +121,13 @@ async def test_unexpected_failure_marks_scan_failed(
 
     monkeypatch.setattr(pipeline.evidence, "upload_evidence", _boom)
     _, client = app_client
+    # force=true bypasses the result cache so the pipeline (and this crash) always run.
     # Starlette sends a 500 but the test transport re-raises app exceptions.
     with pytest.raises(RuntimeError, match="simulated upload outage"):
         await client.post(
-            "/v1/scans", json={"url": fx("index.html")}, headers=user_and_key["headers"]
+            "/v1/scans",
+            json={"url": fx("index.html"), "options": {"force": True}},
+            headers=user_and_key["headers"],
         )
     listing = await client.get("/v1/scans?status=failed", headers=user_and_key["headers"])
     assert listing.json()["total"] >= 1

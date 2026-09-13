@@ -492,6 +492,19 @@
 ### How to verify
 - `pytest tests/test_worker_scans.py tests/test_evidence_service.py` green; full suite 158 passed.
 
+## T16 — AuthScope MCP server (2026-09-13)
+### What was done
+- New `mcp_server/` package (optional extra `mcp`, console script `authscope-mcp`): `client.py` (async httpx wrapper over `/v1`), `server.py` (MCP tools + transports), `__main__.py`.
+- Tools: `create_scan`, `get_scan`, `wait_for_scan`, `scan_and_wait`, `list_scans`, `get_diff`, `bulk_scan`, `bulk_progress`, `submit_feedback`, `feedback_stats`, `health` — over stdio, Streamable HTTP, or legacy SSE.
+- Response shaping: terminal reports return a compact summary; `include_raw=true` adds the full report with long bodies truncated. Polls return `timed_out: true` rather than hanging.
+- Security: HTTP binds loopback only; `--allow-remote` requires a bearer token (`AUTHSCOPE_MCP_TOKEN`) enforced by a pure-ASGI gate. API key is never logged or returned.
+- Errors mapped from the API envelope (`{detail:{code,message}}`) with hints for 401/404/429/unreachable.
+- CI + Makefile lint/typecheck now cover `mcp_server`; CI installs `.[dev,mcp]`.
+- CI repair: MinIO's Docker Hub images (`minio/minio`, `minio/mc`) are no longer pullable — switched CI and compose to `quay.io/minio/{minio,mc}`.
+- Compatibility: pinned `mcp>=1.2,<2`. mcp 2.x renamed `FastMCP` → `MCPServer` (and raises on the v1 import path); v2 support is deferred until that API is validated.
+### How to verify
+- `pytest tests/test_mcp_server.py` green (17 passed); `make lint` clean; `python -m mcp_server --help`.
+
 
 
 
