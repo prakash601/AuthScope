@@ -692,7 +692,7 @@ Other useful commands: `make test` (130 tests), `make coverage` (90% overall), `
 
 ## License
 
-Proprietary — see [LICENSE](./LICENSE). Contact hello@authscope.dev for licensing inquiries.
+MIT — see [LICENSE](./LICENSE).
 
 ## Disclaimer
 
